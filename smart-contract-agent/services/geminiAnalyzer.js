@@ -86,15 +86,17 @@ function buildAnalysisPrompt(pdfData, githubData) {
     .join('\n\n');
 
   const prompt = `
-You are an expert smart contract security auditor and blockchain analyst. Your task is to perform a comprehensive security analysis by comparing a cryptocurrency project's whitepaper claims against its actual smart contract code implementation.
+You are an AGGRESSIVE smart contract security auditor specializing in detecting scams, rugs, and malicious code. Your job is to PROTECT INVESTORS by finding ALL issues, no matter how small.
+
+IMPORTANT: Assume the project could be malicious. Look for ANY signs of deception.
 
 === YOUR MISSION ===
-1. Read and understand the whitepaper content (PDF)
-2. Analyze the Solidity smart contract code
-3. Cross-validate: Find discrepancies between PDF promises and code reality
-4. Identify security vulnerabilities in the code
-5. Assess code quality and centralization risks
-6. Calculate a final risk score
+1. CAREFULLY read the whitepaper (PDF) and note ALL claims about tokenomics, fees, vesting, etc.
+2. THOROUGHLY analyze every function in the smart contract code
+3. AGGRESSIVELY cross-validate: Find ANY mismatch between PDF promises and code reality
+4. IDENTIFY ALL security vulnerabilities - even minor ones
+5. FLAG ALL centralization and rug-pull risks
+6. BE SUSPICIOUS - if something looks wrong, report it
 
 === WHITEPAPER TEXT (FROM PDF) ===
 File: ${pdfData.metadata?.fileName || 'whitepaper.pdf'}
@@ -112,225 +114,227 @@ Total Lines: ${githubData.metadata?.totalLines || 0}
 
 ${combinedCode}
 
+=== MALICIOUS CODE PATTERNS TO DETECT ===
+
+**HONEYPOT DETECTION:**
+- Can only owner sell tokens?
+- Hidden transfer restrictions
+- Blacklist functions that can lock user funds
+- Whitelist-only selling
+- Max transaction amounts that prevent selling
+- Hidden fee increases
+
+**RUG PULL INDICATORS:**
+- Owner can withdraw all liquidity
+- Owner can mint unlimited tokens
+- Owner can change fee to 100%
+- No renounced ownership
+- Proxy contracts that can change logic
+- Hidden backdoor functions
+- Self-destruct capabilities
+
+**HIDDEN MALICIOUS FUNCTIONS:**
+- Functions with misleading names
+- Assembly code blocks (check for suspicious operations)
+- External calls to unknown contracts
+- Obscured logic using complex math
+- Time-delayed traps
+
+**TOKENOMICS LIES:**
+- PDF says 5% fee but code has 10%
+- PDF claims "locked liquidity" but no lock exists
+- PDF says "renounced ownership" but owner functions exist
+- PDF claims "audited" but no evidence
+- Vesting claims without vesting code
+- Burn claims without burn mechanism
+
 === ANALYSIS INSTRUCTIONS ===
 
-**1. CROSS-VALIDATION (PDF vs CODE) - CRITICAL**
-Compare these specific claims from the PDF against the code:
+**1. CROSS-VALIDATION (PDF vs CODE) - MOST CRITICAL**
 
-- Token allocation percentages (team, public sale, ecosystem, treasury)
-  * Look for: teamAllocation, publicSale, ecosystemReserve variables
-  * Compare against PDF claims about distribution
+You MUST compare these specific items:
 
-- Transaction tax/fee percentages
-  * Look for: taxRate, fee, transferFee variables
-  * Compare against PDF claims about fees
+A. TOKEN ALLOCATION:
+   - What does PDF claim about allocation percentages?
+   - What do the code constants/variables show?
+   - Report ANY discrepancy, even 1%
 
-- Total supply numbers
-  * Look for: totalSupply, MAX_SUPPLY, _totalSupply
-  * Compare against PDF claims
+B. TRANSACTION FEES/TAXES:
+   - What fee % does PDF claim?
+   - What is the actual fee in code?
+   - Can owner change fees? To what maximum?
 
-- Vesting schedules
-  * Look for: vesting contracts, timelock mechanisms, cliff periods
-  * Compare against PDF claims about vesting
+C. TOTAL SUPPLY:
+   - PDF stated supply vs code totalSupply
+   - Can more tokens be minted?
 
-- Burning mechanisms
-  * Look for: burn functions, deflationary logic
-  * Compare against PDF claims about token burning
+D. VESTING/LOCKING:
+   - Does PDF claim team tokens are locked?
+   - Is there actual vesting contract logic?
+   - What are the unlock conditions?
 
-- Audit claims
-  * Look for: audit comments, verified contract mentions
-  * Compare against PDF claims about security audits
+E. BURN MECHANISMS:
+   - Does PDF claim deflationary/burn?
+   - Is there actually a burn function?
+   - Is it automatic or manual?
 
-For EACH discrepancy found:
-- Quote the exact PDF claim
-- Quote the exact code reality
-- Explain the severity and impact
+F. OWNERSHIP:
+   - Does PDF claim ownership is renounced?
+   - Is there still an owner in code?
+   - What can the owner do?
 
-**2. SECURITY VULNERABILITIES**
-Check for these vulnerability types:
+G. AUDIT CLAIMS:
+   - Does PDF mention audits?
+   - Is there evidence in code/comments?
 
-- Reentrancy attacks
-  * External calls before state changes
-  * Missing ReentrancyGuard
-  
+**2. SECURITY VULNERABILITIES - BE THOROUGH**
+
+Check EVERY function for:
+- Reentrancy (external calls before state changes)
 - Integer overflow/underflow
-  * Pre-Solidity 0.8.0 without SafeMath
-  * Unchecked arithmetic blocks
-  
-- Access control issues
-  * Missing onlyOwner modifiers
-  * Public functions that should be private
-  * Missing zero-address checks
-  
+- Access control missing or weak
+- Front-running opportunities
 - Denial of service vectors
-  * Unbounded loops
-  * Block gas limit issues
-  
-- Front-running vulnerabilities
-  * Price manipulation risks
-  * Transaction ordering dependencies
-  
-- Unchecked external calls
-  * Missing success checks on .call()
-  * No error handling for external calls
-  
-- Timestamp dependence
-  * block.timestamp for critical logic
-  
-- Delegate call risks
-  * Delegatecall to untrusted contracts
+- Unchecked return values
+- Timestamp manipulation
+- Delegatecall to untrusted addresses
 
-**3. CODE QUALITY ISSUES**
-Assess:
+**3. CENTRALIZATION & RUG RISKS - CRITICAL**
+
+Flag if owner can:
+- Pause trading
+- Blacklist addresses
+- Change fees arbitrarily  
+- Mint new tokens
+- Withdraw contract funds
+- Upgrade contract logic
+- Any other privileged action
+
+**4. CODE QUALITY ISSUES**
 
 - Missing input validation
-  * Zero address checks
-  * Amount validation
-  * Array bounds checking
-  
-- Centralization risks
-  * Single owner can drain funds
-  * Owner can pause forever
-  * Owner can change critical parameters
-  * No timelock on admin functions
-  * Proxy upgrade without governance
-  
-- Missing events
-  * Critical state changes without events
-  * No event emission for transfers/approvals
-  
-- Gas optimization
-  * Expensive loops
-  * Storage vs memory inefficiency
-  * Redundant operations
+- No event emissions
+- Gas inefficiencies
+- Poor coding practices
 
-**4. TOKENOMICS VERIFICATION**
-Extract from CODE (not PDF):
-- Actual team allocation percentage
-- Actual transaction tax percentage  
-- Actual total supply
-- Is vesting logic implemented?
-- Is burn mechanism implemented?
-- Can owner mint unlimited tokens?
-- Is there a max wallet limit?
-- Is there anti-bot protection?
+=== OUTPUT FORMAT - RETURN ONLY VALID JSON ===
 
-=== OUTPUT FORMAT (STRICT JSON ONLY) ===
-
-Return your analysis as a valid JSON object. Do NOT include any text before or after the JSON.
+You MUST return ONLY a JSON object. No text before or after. No markdown code blocks.
 
 {
   "discrepancies": [
     {
-      "type": "allocation_mismatch | tax_mismatch | supply_mismatch | vesting_missing | burn_missing | audit_false",
+      "type": "allocation_mismatch | tax_mismatch | supply_mismatch | vesting_missing | burn_missing | audit_false | ownership_lie",
       "severity": "CRITICAL | HIGH | MEDIUM | LOW",
-      "pdfClaim": "Exact text from whitepaper",
-      "codeReality": "What the code actually does",
-      "description": "Clear explanation of the discrepancy",
-      "impact": "What this means for investors",
-      "codeLocation": "contract/file:line (if identifiable)"
+      "pdfClaim": "Exact quote from whitepaper",
+      "codeReality": "What the code actually shows",
+      "description": "Clear explanation",
+      "impact": "How this affects investors",
+      "codeLocation": "File:Line or function name"
     }
   ],
   
   "vulnerabilities": [
     {
-      "type": "reentrancy | overflow | access_control | dos | frontrunning | unchecked_call | timestamp | delegatecall",
+      "type": "reentrancy | overflow | access_control | dos | frontrunning | unchecked_call | honeypot | rugpull | backdoor",
       "severity": "CRITICAL | HIGH | MEDIUM | LOW",
       "location": "Contract.sol:functionName()",
-      "description": "Clear explanation of the vulnerability",
+      "description": "Explanation of the vulnerability",
       "exploit": "How an attacker could exploit this",
-      "codeSnippet": "Relevant code snippet if available",
-      "recommendation": "How to fix this vulnerability"
+      "codeSnippet": "Relevant code if available",
+      "recommendation": "How to fix"
     }
   ],
   
   "codeQualityIssues": [
     {
-      "type": "centralization | missing_validation | missing_events | gas_inefficiency",
+      "type": "centralization | missing_validation | missing_events | gas_inefficiency | poor_practice",
       "severity": "HIGH | MEDIUM | LOW",
-      "description": "Clear explanation of the issue",
-      "location": "Contract.sol:functionName()",
-      "recommendation": "How to improve this"
+      "description": "Issue description",
+      "location": "Location in code",
+      "recommendation": "Fix suggestion"
     }
   ],
   
   "tokenomicsVerification": {
     "totalSupply": {
-      "pdfClaim": "Value from PDF or 'not specified'",
+      "pdfClaim": "Value or 'not specified'",
       "codeReality": "Actual value from code",
-      "match": true | false
+      "match": true
     },
     "teamAllocation": {
-      "pdfClaim": "Value from PDF or 'not specified'",
+      "pdfClaim": "Value or 'not specified'",
       "codeReality": "Actual value from code",
-      "match": true | false
+      "match": true
     },
     "transactionTax": {
-      "pdfClaim": "Value from PDF or 'not specified'",
+      "pdfClaim": "Value or 'not specified'",
       "codeReality": "Actual value from code",
-      "match": true | false
+      "match": true
     },
-    "vestingImplemented": true | false,
-    "vestingDetails": "Description of vesting logic if found",
-    "burnMechanismImplemented": true | false,
-    "burnDetails": "Description of burn mechanism if found",
-    "unlimitedMinting": true | false,
-    "mintingDetails": "Description of minting capability",
-    "maxWalletLimit": true | false,
-    "antiBotProtection": true | false
+    "vestingImplemented": false,
+    "vestingDetails": "Details or 'NOT FOUND'",
+    "burnMechanismImplemented": false,
+    "burnDetails": "Details or 'NOT FOUND'",
+    "unlimitedMinting": true,
+    "mintingDetails": "Can owner mint?",
+    "ownershipRenounced": false,
+    "ownerCapabilities": ["List what owner can do"],
+    "maxWalletLimit": false,
+    "antiBotProtection": false,
+    "honeypotRisk": false,
+    "rugpullRisk": false
   },
   
   "riskScore": {
-    "overall": 0.0,  // 0-10 scale: 0=definite scam, 10=highly safe
+    "overall": 5.0,
     "breakdown": {
-      "pdfCodeAlignment": 0.0,  // How well PDF matches code (0-10)
-      "securityScore": 0.0,    // Code security level (0-10)
-      "codeQualityScore": 0.0, // Code quality level (0-10)
-      "tokenomicsScore": 0.0   // Tokenomics fairness (0-10)
+      "pdfCodeAlignment": 5.0,
+      "securityScore": 5.0,
+      "codeQualityScore": 5.0,
+      "tokenomicsScore": 5.0
     },
-    "classification": "SAFE | SUSPICIOUS | HIGH-RISK",
-    "confidence": "HIGH | MEDIUM | LOW"
+    "classification": "SUSPICIOUS",
+    "confidence": "HIGH"
   },
   
-  "summary": "A comprehensive 2-3 sentence summary of the analysis findings, highlighting the most critical issues and overall assessment.",
+  "summary": "2-3 sentence summary focusing on the MOST CRITICAL issues found.",
   
   "redFlags": [
-    "List of major red flags that investors should be aware of"
+    "List ALL major concerns - be comprehensive"
   ],
   
   "positiveAspects": [
-    "List of positive aspects if any (good practices, standard patterns, etc.)"
+    "Only list if genuinely positive"
   ]
 }
 
-=== SCORING GUIDELINES ===
+=== SCORING RULES ===
 
-Risk Score Calculation:
-- Start at 10.0 (perfectly safe)
-- Subtract points for issues:
-  * CRITICAL vulnerability: -3.0 each
-  * HIGH severity issue: -1.5 each
-  * MEDIUM severity issue: -0.5 each
-  * LOW severity issue: -0.25 each
-  * Major PDF/code discrepancy: -2.0 each
-  * Missing vesting when claimed: -1.5
-  * Unlimited minting capability: -1.0
-  * High centralization: -1.0
+Start at 10.0 (perfect) and SUBTRACT:
+- CRITICAL issue: -3.0 each
+- HIGH issue: -1.5 each  
+- MEDIUM issue: -0.5 each
+- LOW issue: -0.25 each
+- PDF/code mismatch: -2.0 each
+- Missing vesting when claimed: -1.5
+- Unlimited minting: -1.0
+- Owner not renounced: -0.5
+- Honeypot indicators: -3.0
+- Rugpull indicators: -3.0
 
 Classification:
-- SAFE: 7.0 - 10.0 (minor issues only, can invest with standard caution)
-- SUSPICIOUS: 4.0 - 6.9 (significant issues, invest only small amounts)
-- HIGH-RISK: 0.0 - 3.9 (major issues, do not recommend investment)
+- SAFE: 7.0 - 10.0
+- SUSPICIOUS: 4.0 - 6.9
+- HIGH-RISK: 0.0 - 3.9
 
-=== IMPORTANT REMINDERS ===
-- Be thorough but objective
-- Only report issues you can verify in the code
-- Provide specific code locations when possible
-- Focus on HIGH and CRITICAL severity issues first
-- The JSON must be valid and parseable
-- Do not include markdown code blocks in your response
-- Return ONLY the JSON object, nothing else
-`;
+=== FINAL REMINDER ===
+- Return ONLY valid JSON, nothing else
+- NO markdown code blocks
+- NO text before or after the JSON
+- Be AGGRESSIVE in finding issues
+- ASSUME the project could be malicious
+- Report EVERY issue you find`;
 
   return prompt;
 }
@@ -414,7 +418,7 @@ Return ONLY valid JSON, no other text.
  * @returns {Promise<string>} Raw text response from Gemini
  * @throws {Error} If API call fails
  */
-async function sendToGemini(prompt) {
+async function sendToGemini(prompt, metadata = {}) {
   const geminiModel = initializeGemini();
   
   try {
@@ -422,6 +426,12 @@ async function sendToGemini(prompt) {
       model: MODEL_NAME,
       promptLength: prompt.length,
       estimatedTokens: Math.ceil(prompt.length / 4)
+    });
+    
+    // Log the prompt to file
+    log.logGeminiPrompt(prompt, {
+      ...metadata,
+      promptLength: prompt.length
     });
     
     const startTime = Date.now();
@@ -511,18 +521,32 @@ function parseGeminiResponse(responseText) {
   try {
     let cleaned = responseText.trim();
     
-    // Remove markdown code blocks if present
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.replace(/^```json\s*\n?/, '').replace(/\n?```\s*$/, '');
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+    log.info('Attempting to parse Gemini response', {
+      originalLength: responseText.length,
+      first100Chars: responseText.substring(0, 100)
+    });
+    
+    // Remove markdown code blocks if present (handle various formats)
+    // Handle ```json ... ```
+    cleaned = cleaned.replace(/^```json\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+    // Handle ``` ... ```
+    cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+    
+    // Remove any leading/trailing whitespace again
+    cleaned = cleaned.trim();
+    
+    // Try to find the outermost JSON object braces
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
     }
     
-    // Try to extract JSON if there's text before/after
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleaned = jsonMatch[0];
-    }
+    log.info('Cleaned response for parsing', {
+      cleanedLength: cleaned.length,
+      first100Chars: cleaned.substring(0, 100)
+    });
     
     // Parse JSON
     const parsed = JSON.parse(cleaned);
@@ -563,7 +587,9 @@ function parseGeminiResponse(responseText) {
   } catch (error) {
     log.error('Failed to parse Gemini response as JSON', { 
       error: error.message,
-      responsePreview: responseText.substring(0, 500)
+      errorPosition: error.message.match(/position (\d+)/)?.[1] || 'unknown',
+      responsePreview: responseText.substring(0, 1000),
+      responseLast500: responseText.substring(responseText.length - 500)
     });
     
     // Return a fallback structure with the raw response

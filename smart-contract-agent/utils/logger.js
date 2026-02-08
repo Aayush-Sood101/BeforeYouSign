@@ -12,6 +12,10 @@ if (!fs.existsSync(LOGS_DIR)) {
   fs.mkdirSync(LOGS_DIR, { recursive: true });
 }
 
+// Log file paths
+const PROMPT_LOG_FILE = path.join(LOGS_DIR, 'gemini-prompts.log');
+const RESPONSE_LOG_FILE = path.join(LOGS_DIR, 'gemini-responses.log');
+
 /**
  * Format a log message with timestamp and level
  * @param {string} level - Log level (INFO, ERROR, WARN, DEBUG)
@@ -69,18 +73,17 @@ function debug(message, data = null) {
 }
 
 /**
- * Log Gemini response to a file
- * Appends the response to logs/gemini-responses.log
- * @param {string} response - The raw Gemini response text
+ * Log Gemini prompt to a file
+ * Appends the prompt to logs/gemini-prompts.log
+ * @param {string} prompt - The prompt sent to Gemini
  * @param {Object} metadata - Optional metadata (repo, timestamp, etc.)
  */
-function logGeminiResponse(response, metadata = {}) {
+function logGeminiPrompt(prompt, metadata = {}) {
   const timestamp = new Date().toISOString();
-  const logFile = path.join(LOGS_DIR, 'gemini-responses.log');
   
-  let logEntry = '\n' + '='.repeat(80) + '\n';
-  logEntry += `GEMINI RESPONSE - ${timestamp}\n`;
-  logEntry += '='.repeat(80) + '\n';
+  let logEntry = '\n' + '='.repeat(100) + '\n';
+  logEntry += `GEMINI PROMPT - ${timestamp}\n`;
+  logEntry += '='.repeat(100) + '\n';
   
   if (metadata.repository) {
     logEntry += `Repository: ${metadata.repository}\n`;
@@ -91,14 +94,58 @@ function logGeminiResponse(response, metadata = {}) {
   if (metadata.analysisMode) {
     logEntry += `Analysis Mode: ${metadata.analysisMode}\n`;
   }
+  if (metadata.promptLength) {
+    logEntry += `Prompt Length: ${metadata.promptLength} characters\n`;
+  }
   
-  logEntry += '-'.repeat(80) + '\n';
-  logEntry += response + '\n';
-  logEntry += '='.repeat(80) + '\n\n';
+  logEntry += '-'.repeat(100) + '\n';
+  logEntry += prompt + '\n';
+  logEntry += '='.repeat(100) + '\n\n';
   
   try {
-    fs.appendFileSync(logFile, logEntry, 'utf8');
-    console.log(formatLog('INFO', `Gemini response logged to ${logFile}`));
+    fs.appendFileSync(PROMPT_LOG_FILE, logEntry, 'utf8');
+    console.log(formatLog('INFO', `Gemini PROMPT logged to ${PROMPT_LOG_FILE}`));
+  } catch (err) {
+    console.error(formatLog('ERROR', `Failed to write Gemini prompt to log file: ${err.message}`));
+  }
+}
+
+/**
+ * Log Gemini response to a file
+ * Appends the response to logs/gemini-responses.log
+ * @param {string} response - The raw Gemini response text
+ * @param {Object} metadata - Optional metadata (repo, timestamp, etc.)
+ */
+function logGeminiResponse(response, metadata = {}) {
+  const timestamp = new Date().toISOString();
+  
+  let logEntry = '\n' + '='.repeat(100) + '\n';
+  logEntry += `GEMINI RESPONSE - ${timestamp}\n`;
+  logEntry += '='.repeat(100) + '\n';
+  
+  if (metadata.repository) {
+    logEntry += `Repository: ${metadata.repository}\n`;
+  }
+  if (metadata.pdfFile) {
+    logEntry += `PDF File: ${metadata.pdfFile}\n`;
+  }
+  if (metadata.analysisMode) {
+    logEntry += `Analysis Mode: ${metadata.analysisMode}\n`;
+  }
+  if (metadata.responseLength) {
+    logEntry += `Response Length: ${metadata.responseLength} characters\n`;
+  }
+  if (metadata.duration) {
+    logEntry += `Duration: ${metadata.duration}\n`;
+  }
+  
+  logEntry += '-'.repeat(100) + '\n';
+  logEntry += response + '\n';
+  logEntry += '='.repeat(100) + '\n\n';
+  
+  try {
+    fs.appendFileSync(RESPONSE_LOG_FILE, logEntry, 'utf8');
+    console.log(formatLog('INFO', `Gemini RESPONSE logged to ${RESPONSE_LOG_FILE}`));
   } catch (err) {
     console.error(formatLog('ERROR', `Failed to write Gemini response to log file: ${err.message}`));
   }
@@ -109,5 +156,6 @@ module.exports = {
   error,
   warn,
   debug,
+  logGeminiPrompt,
   logGeminiResponse
 };
