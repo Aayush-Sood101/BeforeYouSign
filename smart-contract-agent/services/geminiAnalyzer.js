@@ -30,7 +30,7 @@ const GENERATION_CONFIG = {
   temperature: 0.3,        // Lower = more focused/deterministic analysis
   topK: 40,
   topP: 0.95,
-  maxOutputTokens: 8192,   // Allow detailed responses
+  maxOutputTokens: 65536,  // Maximum tokens for full detailed response
 };
 
 // Maximum code size to send (to stay under token limits)
@@ -86,25 +86,17 @@ function buildAnalysisPrompt(pdfData, githubData) {
     .join('\n\n');
 
   const prompt = `
-You are an AGGRESSIVE smart contract security auditor specializing in detecting scams, rugs, and malicious code. Your job is to PROTECT INVESTORS by finding ALL issues, no matter how small.
+You are an EXPERT smart contract security auditor specializing in detecting SCAMS, RUGS, and MALICIOUS CODE. Your mission is to PROTECT INVESTORS by finding ALL vulnerabilities and deceptions.
 
-IMPORTANT: Assume the project could be malicious. Look for ANY signs of deception.
+CRITICAL ASSUMPTION: This project is LIKELY MALICIOUS. Search aggressively for hidden exploits.
 
-=== YOUR MISSION ===
-1. CAREFULLY read the whitepaper (PDF) and note ALL claims about tokenomics, fees, vesting, etc.
-2. THOROUGHLY analyze every function in the smart contract code
-3. AGGRESSIVELY cross-validate: Find ANY mismatch between PDF promises and code reality
-4. IDENTIFY ALL security vulnerabilities - even minor ones
-5. FLAG ALL centralization and rug-pull risks
-6. BE SUSPICIOUS - if something looks wrong, report it
-
-=== WHITEPAPER TEXT (FROM PDF) ===
-File: ${pdfData.metadata?.fileName || 'whitepaper.pdf'}
+=== WHITEPAPER/AGREEMENT TEXT (FROM PDF) ===
+File: ${pdfData.metadata?.fileName || 'document.pdf'}
 Pages: ${pdfData.metadata?.pages || 'unknown'}
 
 ${fullText}
 
-=== KEY WHITEPAPER SECTIONS ===
+=== KEY DOCUMENT SECTIONS ===
 ${sectionSummary || 'No specific sections detected'}
 
 === SMART CONTRACT CODE ===
@@ -114,227 +106,308 @@ Total Lines: ${githubData.metadata?.totalLines || 0}
 
 ${combinedCode}
 
-=== MALICIOUS CODE PATTERNS TO DETECT ===
+=== CRITICAL VULNERABILITY PATTERNS TO DETECT ===
 
-**HONEYPOT DETECTION:**
-- Can only owner sell tokens?
-- Hidden transfer restrictions
-- Blacklist functions that can lock user funds
-- Whitelist-only selling
-- Max transaction amounts that prevent selling
-- Hidden fee increases
+You MUST check for these SPECIFIC malicious patterns:
 
-**RUG PULL INDICATORS:**
-- Owner can withdraw all liquidity
-- Owner can mint unlimited tokens
-- Owner can change fee to 100%
-- No renounced ownership
-- Proxy contracts that can change logic
-- Hidden backdoor functions
-- Self-destruct capabilities
+**PATTERN 1: DUAL CONSTANTS (Hidden vs Documented Fees)**
+Look for TWO constants for the same thing - one public (documented), one private (actual):
+\`\`\`
+uint256 public constant DOCUMENTED_FEE = 300;  // 3% shown
+uint256 private constant ACTUAL_FEE = 1000;    // 10% used
+\`\`\`
+Check: PLATFORM_FEE, HIDDEN_FEE, LATE_FEE_RATE, EARLY_TERMINATION, ORIGINATION_FEE, MAINTENANCE_FEE
+Report if ANY private fee constant exists that differs from documented values.
 
-**HIDDEN MALICIOUS FUNCTIONS:**
-- Functions with misleading names
-- Assembly code blocks (check for suspicious operations)
-- External calls to unknown contracts
-- Obscured logic using complex math
-- Time-delayed traps
+**PATTERN 2: HIDDEN FEE COLLECTION WITHOUT EVENTS**
+Look for balance transfers that don't emit Transfer events:
+\`\`\`
+_balances[hiddenFeeCollector] = _balances[hiddenFeeCollector].add(hiddenFee);
+// No Transfer event = invisible theft
+\`\`\`
+Report ALL balance changes without corresponding Transfer events.
 
-**TOKENOMICS LIES:**
-- PDF says 5% fee but code has 10%
-- PDF claims "locked liquidity" but no lock exists
-- PDF says "renounced ownership" but owner functions exist
-- PDF claims "audited" but no evidence
-- Vesting claims without vesting code
-- Burn claims without burn mechanism
+**PATTERN 3: MISSING GRACE PERIOD VALIDATION**
+Look for seizure/liquidation functions WITHOUT time checks:
+\`\`\`
+function seizeCollateral() {
+    // MISSING: require(block.timestamp >= deadline + gracePeriod)
+    // Allows instant seizure without waiting
+}
+\`\`\`
+Check: seizeCollateralForMarginCall, liquidateLoan, seizeTokens
 
-=== ANALYSIS INSTRUCTIONS ===
+**PATTERN 4: ARBITRARY REASON STRING (No Default Validation)**
+Look for seizure functions that accept "reason" strings without validating actual default conditions:
+\`\`\`
+function liquidateLoan(uint256 loanId, string memory reason) {
+    // "reason" is not validated against actual default events
+    // Allows: liquidateLoan(123, "I feel like it")
+}
+\`\`\`
+Check: seizeCollateral, liquidateLoan, seizeTokens - must validate Section VII/VIII default events
 
-**1. CROSS-VALIDATION (PDF vs CODE) - MOST CRITICAL**
+**PATTERN 5: UNLIMITED MINTING (Rebase/Supply Manipulation)**
+Look for functions that can increase totalSupply:
+\`\`\`
+function rebase(uint256 supplyDelta) external onlyOwner {
+    _totalSupply = _totalSupply.add(supplyDelta);
+    _balances[owner] = _balances[owner].add(supplyDelta);
+}
+\`\`\`
+Report if owner can mint unlimited tokens despite "fixed supply" claims.
 
-You MUST compare these specific items:
+**PATTERN 6: ACCOUNT FREEZING CAPABILITY**
+Look for:
+\`\`\`
+mapping(address => bool) public frozenAccounts;
+function freezeAccount(address account) external onlyOwner { ... }
+\`\`\`
+Report if owner can freeze any account's tokens.
 
-A. TOKEN ALLOCATION:
-   - What does PDF claim about allocation percentages?
-   - What do the code constants/variables show?
-   - Report ANY discrepancy, even 1%
+**PATTERN 7: TOKEN SEIZURE WITHOUT VALID DEFAULT**
+Look for:
+\`\`\`
+function seizeTokens(address from, uint256 amount) external onlyLender {
+    // No check for actual default conditions
+    _balances[from] = _balances[from].sub(amount);
+}
+\`\`\`
+Report if tokens can be seized without validating default criteria.
 
-B. TRANSACTION FEES/TAXES:
-   - What fee % does PDF claim?
-   - What is the actual fee in code?
-   - Can owner change fees? To what maximum?
+**PATTERN 8: APPROVAL GATEKEEPER FOR WITHDRAWALS**
+Look for withdrawal functions requiring external approval:
+\`\`\`
+require(deposit.approvedForReturn, "Vault: not approved");
+function approveCollateralReturn(uint256 id, bool approved) external onlyLender { ... }
+\`\`\`
+Report if automatic collateral return is blocked by gatekeeper.
 
-C. TOTAL SUPPLY:
-   - PDF stated supply vs code totalSupply
-   - Can more tokens be minted?
+**PATTERN 9: EMERGENCY FUNCTIONS WITHOUT SAFEGUARDS**
+Look for:
+\`\`\`
+function emergencyWithdraw(address recipient) external onlyOwner {
+    // NO timelock, NO multi-sig, NO active loan checks
+    token.transfer(recipient, token.balanceOf(address(this)));
+}
+\`\`\`
+Report ALL emergency functions that can drain funds without safeguards.
 
-D. VESTING/LOCKING:
-   - Does PDF claim team tokens are locked?
-   - Is there actual vesting contract logic?
-   - What are the unlock conditions?
+**PATTERN 10: FEE RATE MANIPULATION MID-CONTRACT**
+Look for:
+\`\`\`
+function adjustBorrowFeeRate(uint256 loanId, uint256 newRate) external onlyLender {
+    // Can change 5% to 50% during active loan
+    loan.borrowFeeRate = newRate;
+}
+\`\`\`
+Report if fees can be changed unilaterally on active loans.
 
-E. BURN MECHANISMS:
-   - Does PDF claim deflationary/burn?
-   - Is there actually a burn function?
-   - Is it automatic or manual?
+**PATTERN 11: LENDER-CONTROLLED FLAGS (Market Disruption)**
+Look for:
+\`\`\`
+function setMarketDisruption(uint256 loanId, bool active) external onlyLender {
+    // No validation of actual market conditions
+    marketDisruptionActive[loanId] = active;
+}
+\`\`\`
+Report if lender can manipulate conditions arbitrarily.
 
-F. OWNERSHIP:
-   - Does PDF claim ownership is renounced?
-   - Is there still an owner in code?
-   - What can the owner do?
+**PATTERN 12: CROSS-DEFAULT CASCADE**
+Look for:
+\`\`\`
+function _triggerCrossDefault(address borrower, uint256 triggerLoanId) {
+    // Defaults ALL borrower's loans based on single (possibly false) trigger
+    for (uint i = 0; i < borrowerLoans[borrower].length; i++) {
+        loans[loanIds[i]].status = LoanStatus.DEFAULTED;
+    }
+}
+\`\`\`
+Report if false default can cascade to all loans.
 
-G. AUDIT CLAIMS:
-   - Does PDF mention audits?
-   - Is there evidence in code/comments?
+**PATTERN 13: PROXY UPGRADE WITHOUT TIMELOCK**
+Look for:
+\`\`\`
+function upgradeTo(address newImplementation) external onlyAdmin {
+    // MISSING: timelock delay (should be 48+ hours)
+    _setImplementation(newImplementation);
+}
+\`\`\`
+Report instant proxy upgrades without timelock.
 
-**2. SECURITY VULNERABILITIES - BE THOROUGH**
+**PATTERN 14: HIDDEN BACKDOOR ADMIN**
+Look for non-standard storage slots:
+\`\`\`
+bytes32 private constant BACKDOOR_ADMIN_SLOT = 0x1234...;
+function _getBackdoorAdmin() internal view returns (address) { ... }
+\`\`\`
+Report ANY hidden admin storage slots.
 
-Check EVERY function for:
-- Reentrancy (external calls before state changes)
-- Integer overflow/underflow
-- Access control missing or weak
-- Front-running opportunities
-- Denial of service vectors
-- Unchecked return values
-- Timestamp manipulation
-- Delegatecall to untrusted addresses
+**PATTERN 15: FAKE MULTI-SIG (1-of-N instead of M-of-N)**
+Look for:
+\`\`\`
+uint256 public constant CLAIMED_REQUIRED_SIGNATURES = 5;  // Shown
+uint256 private constant ACTUAL_REQUIRED_SIGNATURES = 1;  // Used
+\`\`\`
+Check if multi-sig actually requires claimed number of signatures.
 
-**3. CENTRALIZATION & RUG RISKS - CRITICAL**
+**PATTERN 16: STORAGE COLLISION IN UPGRADES**
+Look for MaliciousImplementation contracts with incompatible storage:
+\`\`\`
+contract MaliciousImplementation {
+    address public attacker;  // Overwrites original storage slot 0
+}
+\`\`\`
 
-Flag if owner can:
-- Pause trading
-- Blacklist addresses
-- Change fees arbitrarily  
-- Mint new tokens
-- Withdraw contract funds
-- Upgrade contract logic
-- Any other privileged action
+**PATTERN 17: SELFDESTRUCT CAPABILITY**
+Look for:
+\`\`\`
+function destroy(address payable recipient) external {
+    selfdestruct(recipient);  // Destroys contract, steals all ETH
+}
+\`\`\`
 
-**4. CODE QUALITY ISSUES**
+=== CROSS-VALIDATION: PDF vs CODE ===
 
-- Missing input validation
-- No event emissions
-- Gas inefficiencies
-- Poor coding practices
+You MUST compare these specific items from the PDF agreement against the code:
 
-=== OUTPUT FORMAT - RETURN ONLY VALID JSON ===
+1. **FEES**: 
+   - PDF claimed platform/transaction fee %?
+   - Actual fee in code? Look for HIDDEN_FEE, private fee constants
+   - Are there UNDISCLOSED fees?
 
-You MUST return ONLY a JSON object. No text before or after. No markdown code blocks.
+2. **LATE FEES**:
+   - PDF claimed late fee rate?
+   - Actual LATE_FEE_RATE in code?
+   - Is ACTUAL_LATE_FEE_RATE different from DOCUMENTED_LATE_FEE_RATE?
+
+3. **EARLY TERMINATION FEES**:
+   - PDF claimed early termination penalty?
+   - Actual penalty in code?
+   - Is ACTUAL_EARLY_TERMINATION different from DOCUMENTED?
+
+4. **GRACE PERIODS**:
+   - PDF claimed grace period for margin calls?
+   - Is grace period enforced in seizeCollateralForMarginCall()?
+
+5. **COLLATERAL RETURN**:
+   - PDF claims automatic return after repayment?
+   - Is there an approval gatekeeper blocking automatic return?
+
+6. **DEFAULT CONDITIONS**:
+   - PDF lists specific default events (Section VII/VIII)?
+   - Are they actually validated in liquidation functions?
+   - Or can any "reason" string trigger default?
+
+7. **MULTI-SIG**:
+   - PDF claims 5-of-9 multi-sig?
+   - Is it actually 1-of-9?
+
+8. **UPGRADE TIMELOCK**:
+   - Any claims about upgrade delays?
+   - Is upgradeTo() instant or timelocked?
+
+=== OUTPUT FORMAT ===
+
+Return ONLY a valid JSON object. NO markdown. NO text before or after.
 
 {
   "discrepancies": [
     {
-      "type": "allocation_mismatch | tax_mismatch | supply_mismatch | vesting_missing | burn_missing | audit_false | ownership_lie",
+      "type": "hidden_fee | fee_mismatch | grace_period_missing | approval_gatekeeper | default_validation_missing | multisig_fake | timelock_missing | supply_manipulation",
       "severity": "CRITICAL | HIGH | MEDIUM | LOW",
-      "pdfClaim": "Exact quote from whitepaper",
-      "codeReality": "What the code actually shows",
-      "description": "Clear explanation",
-      "impact": "How this affects investors",
-      "codeLocation": "File:Line or function name"
+      "pdfClaim": "What the document claims",
+      "codeReality": "What the code actually does",
+      "description": "Clear explanation of the deception",
+      "impact": "Financial impact on users",
+      "codeLocation": "Contract.sol:functionName() or line number"
     }
   ],
   
   "vulnerabilities": [
     {
-      "type": "reentrancy | overflow | access_control | dos | frontrunning | unchecked_call | honeypot | rugpull | backdoor",
+      "type": "hidden_fee | unlimited_minting | account_freezing | token_seizure | emergency_drain | fee_manipulation | cross_default | backdoor_admin | instant_upgrade | selfdestruct | storage_collision | fake_multisig",
       "severity": "CRITICAL | HIGH | MEDIUM | LOW",
       "location": "Contract.sol:functionName()",
-      "description": "Explanation of the vulnerability",
-      "exploit": "How an attacker could exploit this",
-      "codeSnippet": "Relevant code if available",
-      "recommendation": "How to fix"
+      "description": "How the vulnerability works",
+      "exploit": "Specific attack scenario",
+      "codeSnippet": "The malicious code",
+      "financialImpact": "Estimated $ loss"
     }
   ],
   
   "codeQualityIssues": [
     {
-      "type": "centralization | missing_validation | missing_events | gas_inefficiency | poor_practice",
+      "type": "centralization | missing_validation | missing_events | reentrancy | access_control",
       "severity": "HIGH | MEDIUM | LOW",
       "description": "Issue description",
-      "location": "Location in code",
-      "recommendation": "Fix suggestion"
+      "location": "Location in code"
     }
   ],
   
   "tokenomicsVerification": {
-    "totalSupply": {
-      "pdfClaim": "Value or 'not specified'",
-      "codeReality": "Actual value from code",
-      "match": true
-    },
-    "teamAllocation": {
-      "pdfClaim": "Value or 'not specified'",
-      "codeReality": "Actual value from code",
-      "match": true
-    },
-    "transactionTax": {
-      "pdfClaim": "Value or 'not specified'",
-      "codeReality": "Actual value from code",
-      "match": true
-    },
-    "vestingImplemented": false,
-    "vestingDetails": "Details or 'NOT FOUND'",
-    "burnMechanismImplemented": false,
-    "burnDetails": "Details or 'NOT FOUND'",
+    "documentedFee": "Fee % claimed in PDF",
+    "actualFee": "Fee % in code (include hidden)",
+    "feeMismatch": true,
+    "documentedLateFee": "Late fee % in PDF",
+    "actualLateFee": "Late fee % in code",
+    "lateFeeMismatch": true,
+    "gracePeriodClaimed": "Grace period in PDF",
+    "gracePeriodEnforced": false,
     "unlimitedMinting": true,
-    "mintingDetails": "Can owner mint?",
-    "ownershipRenounced": false,
-    "ownerCapabilities": ["List what owner can do"],
-    "maxWalletLimit": false,
-    "antiBotProtection": false,
-    "honeypotRisk": false,
-    "rugpullRisk": false
+    "canFreezeAccounts": true,
+    "canSeizeWithoutDefault": true,
+    "hasBackdoorAdmin": true,
+    "hasInstantUpgrade": true,
+    "fakeMultisig": true
   },
   
   "riskScore": {
-    "overall": 5.0,
-    "breakdown": {
-      "pdfCodeAlignment": 5.0,
-      "securityScore": 5.0,
-      "codeQualityScore": 5.0,
-      "tokenomicsScore": 5.0
-    },
-    "classification": "SUSPICIOUS",
+    "overall": 0.0,
+    "classification": "HIGH-RISK",
     "confidence": "HIGH"
   },
   
-  "summary": "2-3 sentence summary focusing on the MOST CRITICAL issues found.",
+  "summary": "2-3 sentences summarizing the MOST CRITICAL vulnerabilities found.",
   
   "redFlags": [
-    "List ALL major concerns - be comprehensive"
+    "List EVERY major issue found"
   ],
   
-  "positiveAspects": [
-    "Only list if genuinely positive"
-  ]
+  "positiveAspects": []
 }
 
-=== SCORING RULES ===
+=== SCORING ===
 
-Start at 10.0 (perfect) and SUBTRACT:
-- CRITICAL issue: -3.0 each
-- HIGH issue: -1.5 each  
-- MEDIUM issue: -0.5 each
-- LOW issue: -0.25 each
-- PDF/code mismatch: -2.0 each
-- Missing vesting when claimed: -1.5
-- Unlimited minting: -1.0
-- Owner not renounced: -0.5
-- Honeypot indicators: -3.0
-- Rugpull indicators: -3.0
+Start at 10.0 and SUBTRACT:
+- Hidden fee: -3.0
+- Missing grace period: -2.0
+- Unlimited minting: -3.0
+- Token seizure without default: -3.0
+- Emergency drain capability: -3.0
+- Fee manipulation: -2.0
+- Cross-default cascade: -2.0
+- Backdoor admin: -3.0
+- Instant upgrade: -2.0
+- Fake multi-sig: -2.0
+- Account freezing: -1.5
+- Each other HIGH issue: -1.5
+- Each MEDIUM issue: -0.5
 
 Classification:
 - SAFE: 7.0 - 10.0
 - SUSPICIOUS: 4.0 - 6.9
 - HIGH-RISK: 0.0 - 3.9
 
-=== FINAL REMINDER ===
-- Return ONLY valid JSON, nothing else
-- NO markdown code blocks
-- NO text before or after the JSON
-- Be AGGRESSIVE in finding issues
-- ASSUME the project could be malicious
-- Report EVERY issue you find`;
+=== CRITICAL REMINDERS ===
+
+1. Return ONLY valid JSON - NO markdown code blocks
+2. Check for DUAL CONSTANTS pattern (public documented vs private actual)
+3. Check for MISSING EVENTS on balance transfers
+4. Check for MISSING VALIDATION on seizure/liquidation
+5. Check for ARBITRARY REASON STRINGS
+6. Report EVERY vulnerability you find
+7. Be AGGRESSIVE - assume malicious intent`;
 
   return prompt;
 }
@@ -453,7 +526,8 @@ async function sendToGemini(prompt, metadata = {}) {
     
     // Log the full Gemini response to file (not terminal)
     log.logGeminiResponse(text, {
-      analysisMode: 'gemini-api',
+      ...metadata,
+      analysisMode: metadata.analysisMode || 'gemini-api',
       responseLength: text.length,
       duration: `${duration}s`
     });
@@ -509,6 +583,116 @@ async function sendToGemini(prompt, metadata = {}) {
 // =============================================================================
 // RESPONSE PARSING
 // =============================================================================
+
+/**
+ * Attempt to repair truncated JSON by closing unclosed structures
+ * @param {string} json - Potentially truncated JSON string
+ * @param {boolean} aggressive - If true, truncate to last complete object/array
+ * @returns {string} Repaired JSON string
+ */
+function repairTruncatedJSON(json, aggressive = false) {
+  let repaired = json.trim();
+  
+  if (aggressive) {
+    // Find the last complete structure by looking for complete key-value pairs
+    // Remove incomplete trailing content after last complete value
+    
+    // Find last complete string value (ends with ")
+    const lastCompleteString = repaired.lastIndexOf('",');
+    const lastCompleteNumber = repaired.search(/\d,\s*"[^"]+"\s*:\s*$/);
+    const lastCompleteBoolean = repaired.lastIndexOf('true,');
+    const lastCompleteBooleanF = repaired.lastIndexOf('false,');
+    const lastCompleteNull = repaired.lastIndexOf('null,');
+    const lastCompleteArray = repaired.lastIndexOf('],');
+    const lastCompleteObject = repaired.lastIndexOf('},');
+    
+    // Find the most recent complete item
+    const positions = [
+      lastCompleteString,
+      lastCompleteNumber,
+      lastCompleteBoolean,
+      lastCompleteBooleanF,
+      lastCompleteNull,
+      lastCompleteArray,
+      lastCompleteObject
+    ].filter(p => p > 0);
+    
+    if (positions.length > 0) {
+      const cutPoint = Math.max(...positions);
+      // Cut at the comma after the complete value
+      const commaPos = repaired.indexOf(',', cutPoint);
+      if (commaPos > 0) {
+        repaired = repaired.substring(0, commaPos);
+      }
+    }
+  }
+  
+  // Remove any trailing incomplete key or value
+  // Pattern: "key": " (incomplete string value)
+  repaired = repaired.replace(/,?\s*"[^"]*":\s*"[^"]*$/, '');
+  // Pattern: "key": (no value)
+  repaired = repaired.replace(/,?\s*"[^"]*":\s*$/, '');
+  // Pattern: just a comma or partial
+  repaired = repaired.replace(/,\s*$/, '');
+  
+  // Count unclosed brackets
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let escapeNext = false;
+  
+  for (let i = 0; i < repaired.length; i++) {
+    const char = repaired[i];
+    
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    
+    if (!inString) {
+      if (char === '{') openBraces++;
+      else if (char === '}') openBraces--;
+      else if (char === '[') openBrackets++;
+      else if (char === ']') openBrackets--;
+    }
+  }
+  
+  // Close unclosed strings first (if we're in a string)
+  if (inString) {
+    repaired += '"';
+  }
+  
+  // Close unclosed arrays
+  while (openBrackets > 0) {
+    repaired += ']';
+    openBrackets--;
+  }
+  
+  // Close unclosed objects
+  while (openBraces > 0) {
+    repaired += '}';
+    openBraces--;
+  }
+  
+  log.info('JSON repair attempted', {
+    originalLength: json.length,
+    repairedLength: repaired.length,
+    addedBraces: repaired.length - json.length,
+    aggressive
+  });
+  
+  return repaired;
+}
 
 /**
  * Parse Gemini's text response into a structured JSON object
@@ -581,8 +765,34 @@ function parseGeminiResponse(responseText) {
       last50Chars: cleaned.substring(Math.max(0, cleaned.length - 50))
     });
     
+    // Step 4: Try to repair truncated JSON
+    let jsonToparse = cleaned;
+    let isTruncated = false;
+    
+    // Check if JSON is truncated (doesn't end with })
+    if (!cleaned.trim().endsWith('}')) {
+      log.warn('JSON appears to be truncated, attempting repair...');
+      isTruncated = true;
+      jsonToparse = repairTruncatedJSON(cleaned);
+    }
+    
     // Parse JSON
-    const parsed = JSON.parse(cleaned);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonToparse);
+    } catch (parseError) {
+      // If first attempt fails, try more aggressive repair
+      log.warn('Initial parse failed, trying aggressive repair...');
+      jsonToparse = repairTruncatedJSON(cleaned, true);
+      parsed = JSON.parse(jsonToparse);
+    }
+    
+    // Mark if response was truncated
+    if (isTruncated) {
+      parsed._wasTruncated = true;
+      if (!parsed.redFlags) parsed.redFlags = [];
+      parsed.redFlags.push('AI response was truncated - some details may be missing');
+    }
     
     // Validate required fields exist
     const requiredFields = ['riskScore', 'summary'];
