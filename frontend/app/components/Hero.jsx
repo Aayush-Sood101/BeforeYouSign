@@ -19,7 +19,7 @@ function Hero() {
           className="object-cover w-full h-full opacity-60"
           src="https://www.auraui.com/memeimage/web-dev.jpeg"
           alt="Background"
-        />
+        />₹
       </div>
 
       <div className="relative">

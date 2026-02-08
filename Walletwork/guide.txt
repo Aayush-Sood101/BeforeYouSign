@@ -1,0 +1,74 @@
+Walletwork: Project Presentation Guide
+This guide is designed to help you explain Walletwork (Provisional Name: "BeforeYouSign") to judges, covering the problem, solution, technical details, and live demo flow.
+
+1. The Elevation Pitch (The "Why")
+The Problem:
+
+"In Web3, signing a transaction is like signing a contract in a foreign language. Users blindly approve transactions, hoping they aren't interacting with a scammer or a drainer contract. Once the money is gone, it's gone forever."
+
+The Solution:
+
+"Walletwork is a Pre-Transaction Firewall. It acts as an antivirus for your crypto wallet. Before you sign anything, our AI engine analyzes the transaction in real-time to detect scams, fresh wallets, and malicious code. We tell you 'Is this safe?' before it's too late."
+
+2. Core Concepts (Explain Like I'm 5)
+When judges ask "What does X do?", use these simple definitions:
+
+Wallet Address (0x111...)
+Analogy: Think of it like an Email Address or Bank Account Number.
+Role: It represents a user or an entity on the blockchain.
+Risk: If a wallet is brand new (0 transactions) or linked to known criminals, it's dangerous.
+Contract Address (0xabc...)
+Analogy: Think of it like a Vending Machine or a Robot.
+Role: It's a program that lives on the blockchain. When you send money to it, it runs code (e.g., swapping tokens, staking).
+Risk: A "malicious contract" is a robot programmed to steal your money instead of swapping it.
+3. The Technical Architecture (The "How")
+This is where you show off your engineering skills. Explain these 4 Pillars:
+
+1. The Data Source: Alchemy
+What is it?: A node provider (our gateway to the blockchain).
+Our Use Case: We use Alchemy to ask:
+"How many transactions has this wallet made?" (Detects fresh wallets).
+"Is this address a contract or a person?"
+"Who has this wallet interacted with recently?"
+2. The Verifier: Etherscan
+What is it?: A block explorer and code repository.
+Our Use Case: We check:
+"Is the source code of this contract published and verified?"
+Logic: If a contract is unverified (hidden code), it is HIGH RISK. Legitimate projects always verify their code.
+3. The Brain: Risk Engine (Python/FastAPI)
+What is it?: Your custom backend logic.
+Logic Flow:
+Phase 1 (Static): Does the address look like a bot? (0x000...)
+Phase 2 (On-Chain): checks Alchemy for history and 
+Etherscan
+ for verification.
+Phase 3 (Graph): Checks Graph Signals. Are you friends with a scammer? (Hop Distance).
+Phase 3 (Simulation): "What happens if I sign?" Predicts drain probability.
+4. The Interface: React + Extension
+Frontend: A dashboard for manual checks.
+Extension: A literal Firewall. It intercepts the Sign request from MetaMask and blocks it if the risk score is too high.
+4. Step-by-Step Demo Flow
+Scene: You are on stage. You have the Frontend open.
+
+"Let's simulate a scam."
+
+Enter a Fresh Wallet (e.g., 0x1111...).
+Enter a Contract Address (e.g., USDT 0xdAC...).
+Click Analyze.
+Explain the Result:
+
+"See this High Risk warning? Our engine detected this wallet has 0 transactions history. Scammers generate new wallets instantly to hide tracks. We catch that immediately."
+"Now, the Graph Intelligence."
+
+Enter the Scam Wallet (from 
+scam_db.json
+).
+Click Analyze.
+"Look at the Fraud Radar. It says 'Critical: 0 Hop'. This means this wallet is directly blacklisted or connected to a known cluster."
+"Finally, the Simulation."
+
+"The Fraud Forecast shows an 85% Drain Probability. It knows that approving a token to a high-risk contract usually results in theft."
+5. Why This Wins?
+Proactive: Most tools are explorers (post-mortem). We are a Firewall (pre-transaction).
+Multilayered: We combine Graph Theory (connections), on-chain data (facts), and ML heuristics (patterns).
+User Experience: We don't just show data; we give a clear Veridct: Safe or Dangerous.
