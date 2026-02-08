@@ -6,6 +6,7 @@ import { Menu, X, ShieldCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 // Utility for cleaner tailwind class merging
 function cn(...inputs) {
@@ -15,7 +16,7 @@ function cn(...inputs) {
 const navLinks = [
   { href: "/home", label: "Home" },
   { href: "/analyze", label: "Analyze" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/contact", label: "Contact Us" },
 ];
 
 const Header = () => {
@@ -71,18 +72,30 @@ const Header = () => {
 
           {/* 3. DESKTOP ACTIONS (RIGHT) */}
           <div className="hidden md:flex items-center gap-6 z-20">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-zinc-300 hover:text-white transition-colors"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="px-5 py-2 text-sm font-semibold text-black bg-white rounded-full hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
-            >
-              Sign up
-            </Link>
+            <SignedOut>
+              <Link
+                href="/login"
+                className="text-sm font-medium text-zinc-300 hover:text-white transition-colors"
+              >
+                Log in
+              </Link>
+              <Link
+                href="/signup"
+                className="px-5 py-2 text-sm font-semibold text-black bg-white rounded-full hover:bg-zinc-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+              >
+                Sign up
+              </Link>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                afterSignOutUrl="/home"
+                appearance={{
+                  elements: {
+                    avatarBox: "w-9 h-9",
+                  },
+                }}
+              />
+            </SignedIn>
           </div>
 
           {/* 4. MOBILE TOGGLE */}
@@ -130,20 +143,34 @@ const Header = () => {
               transition={{ delay: 0.3 }}
               className="w-full max-w-xs flex flex-col gap-4 mt-8"
             >
-              <Link
-                href="/login"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full py-3 text-center text-zinc-300 border border-white/10 rounded-full hover:bg-white/5 active:scale-95 transition-all"
-              >
-                Log in
-              </Link>
-              <Link
-                href="/signup"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="w-full py-3 text-center font-semibold text-black bg-white rounded-full hover:bg-zinc-200 active:scale-95 transition-all"
-              >
-                Sign up
-              </Link>
+              <SignedOut>
+                <Link
+                  href="/login"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full py-3 text-center text-zinc-300 border border-white/10 rounded-full hover:bg-white/5 active:scale-95 transition-all"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/signup"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="w-full py-3 text-center font-semibold text-black bg-white rounded-full hover:bg-zinc-200 active:scale-95 transition-all"
+                >
+                  Sign up
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <div className="flex justify-center">
+                  <UserButton
+                    afterSignOutUrl="/home"
+                    appearance={{
+                      elements: {
+                        avatarBox: "w-12 h-12",
+                      },
+                    }}
+                  />
+                </div>
+              </SignedIn>
             </motion.div>
           </motion.div>
         )}

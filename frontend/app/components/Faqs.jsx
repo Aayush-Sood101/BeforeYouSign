@@ -131,7 +131,7 @@ const Faqs = () => {
                </div>
                <h3 className="text-2xl font-bold text-white mb-2">Still blocked?</h3>
                <p className="text-neutral-400 mb-8 text-sm leading-6">
-                 Can't find the answer you're looking for? Our security team is available to help clarify specific use cases.
+                 Can&;t find the answer you&;re looking for? Our security team is available to help clarify specific use cases.
                </p>
                
                <Link 
