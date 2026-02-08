@@ -18,6 +18,7 @@ const { validateGithubUrl, validatePdfFile } = require('./utils/validators');
 
 // Import services
 const { analyzePdf } = require('./services/pdfParser');
+const { fetchGithubCode } = require('./services/githubFetcher');
 
 // Initialize Express app
 const app = express();
@@ -172,14 +173,29 @@ app.post('/api/analyze', upload.single('pdf'), async (req, res) => {
     });
 
     // PHASE 2: Extract and structure PDF content
-    log.info('Starting PDF extraction...');
+    log.info('=== PHASE 2: PDF Extraction ===');
     const pdfData = await analyzePdf(filePath);
 
     // Generate summary
     const { generateSummary } = require('./services/pdfParser');
     const summary = generateSummary(pdfData);
+    
+    log.info('Phase 2 complete', {
+      pages: pdfData.metadata.pages,
+      textLength: pdfData.metadata.textLength
+    });
 
-    // Response with PDF extraction (ready for Gemini in Phase 4)
+    // PHASE 3: Fetch GitHub code
+    log.info('=== PHASE 3: GitHub Code Extraction ===');
+    const githubData = await fetchGithubCode(githubUrl);
+    
+    log.info('Phase 3 complete', {
+      repository: githubData.metadata.repository,
+      files: githubData.metadata.totalFiles,
+      lines: githubData.metadata.totalLines
+    });
+
+    // Response with both PDF and GitHub data (ready for Gemini in Phase 4)
     res.json({
       success: true,
       analysis: {
@@ -190,19 +206,19 @@ app.post('/api/analyze', upload.single('pdf'), async (req, res) => {
           summary: summary
         },
         github: {
-          status: 'pending',
-          message: 'GitHub code extraction coming in Phase 3',
-          repository: {
-            url: githubUrl,
-            owner: urlValidation.owner,
-            repo: urlValidation.repo
-          }
+          metadata: githubData.metadata,
+          status: githubData.status,
+          fileCount: githubData.metadata.totalFiles,
+          lineCount: githubData.metadata.totalLines,
+          categories: githubData.metadata.categories,
+          codeSize: `${(githubData.metadata.totalSize / 1024).toFixed(2)} KB`
         },
         ai: {
           status: 'pending',
           message: 'Gemini AI analysis coming in Phase 4'
         },
-        note: 'PDF text extracted and structured. Ready for AI analysis when Phase 4 is implemented.',
+        readyFor: 'gemini_analysis',
+        note: 'Both PDF text and GitHub code extracted successfully. Ready for AI analysis in Phase 4.',
         timestamp: new Date().toISOString()
       }
     });
@@ -259,29 +275,47 @@ app.post('/api/analyze/quick', async (req, res) => {
       repo: urlValidation.repo
     });
 
-    // TODO: Phase 3-5 - Implement GitHub fetching and analysis
+    // PHASE 3: Fetch GitHub code
+    log.info('=== PHASE 3: GitHub Code Extraction ===');
+    const githubData = await fetchGithubCode(githubUrl);
+    
+    log.info('Phase 3 complete', {
+      repository: githubData.metadata.repository,
+      files: githubData.metadata.totalFiles,
+      lines: githubData.metadata.totalLines
+    });
+
+    // Response with GitHub data (ready for Gemini in Phase 4)
     res.json({
       success: true,
-      message: 'Quick analysis endpoint is ready! Implementation coming in Phases 3-5',
-      receivedData: {
-        githubRepo: {
-          url: githubUrl,
-          owner: urlValidation.owner,
-          repo: urlValidation.repo
-        }
-      },
-      nextSteps: [
-        'Phase 3: GitHub repository code fetching',
-        'Phase 4: AI-powered vulnerability analysis',
-        'Phase 5: Risk scoring'
-      ]
+      analysis: {
+        github: {
+          metadata: githubData.metadata,
+          status: githubData.status,
+          fileCount: githubData.metadata.totalFiles,
+          lineCount: githubData.metadata.totalLines,
+          categories: githubData.metadata.categories,
+          codeSize: `${(githubData.metadata.totalSize / 1024).toFixed(2)} KB`
+        },
+        ai: {
+          status: 'pending',
+          message: 'Gemini AI analysis coming in Phase 4'
+        },
+        readyFor: 'gemini_analysis',
+        note: 'GitHub code extracted successfully. Ready for AI analysis in Phase 4.',
+        timestamp: new Date().toISOString()
+      }
     });
 
   } catch (error) {
-    log.error('Error in quick analysis endpoint', error);
+    log.error('Error in quick analysis endpoint', { 
+      error: error.message,
+      stack: error.stack 
+    });
     res.status(500).json({
       success: false,
-      error: 'Internal server error during analysis'
+      error: error.message || 'Internal server error during analysis',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
