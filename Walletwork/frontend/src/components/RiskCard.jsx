@@ -1,89 +1,110 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle, ShieldAlert, AlertOctagon } from 'lucide-react';
 
-const RiskCard = ({ risk, score, reasons }) => {
-    const getRiskConfig = (risk) => {
-        switch (risk) {
-            case 'SAFE':
-                return {
-                    icon: CheckCircle,
-                    color: 'text-green-400',
-                    border: 'border-green-500/30',
-                    bg: 'bg-green-500/5',
-                    bar: 'bg-green-500'
-                };
-            case 'SUSPICIOUS':
-                return {
-                    icon: AlertTriangle,
-                    color: 'text-yellow-400',
-                    border: 'border-yellow-500/30',
-                    bg: 'bg-yellow-500/5',
-                    bar: 'bg-yellow-500'
-                };
-            case 'HIGH_RISK':
-                return {
-                    icon: AlertOctagon,
-                    color: 'text-red-500',
-                    border: 'border-red-500/30',
-                    bg: 'bg-red-500/10',
-                    bar: 'bg-red-500'
-                };
-            default:
-                return { icon: ShieldAlert, color: 'text-gray-400', border: 'border-gray-700', bg: 'bg-gray-800', bar: 'bg-gray-600' };
-        }
-    };
+const mapRisk = (risk) => {
+    switch (risk) {
+        case 'SAFE':
+            return { label: 'Safe', tone: 'safe' };
+        case 'SUSPICIOUS':
+            return { label: 'Caution', tone: 'caution' };
+        case 'HIGH_RISK':
+            return { label: 'Dangerous', tone: 'danger' };
+        default:
+            return { label: 'Unknown', tone: 'neutral' };
+    }
+};
 
-    const config = getRiskConfig(risk);
-    const Icon = config.icon;
+const toneClasses = {
+    safe: {
+        badge: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        bar: 'bg-emerald-500',
+    },
+    caution: {
+        badge: 'bg-amber-50 text-amber-800 border-amber-200',
+        bar: 'bg-amber-500',
+    },
+    danger: {
+        badge: 'bg-red-50 text-red-800 border-red-200',
+        bar: 'bg-red-500',
+    },
+    neutral: {
+        badge: 'bg-slate-50 text-slate-800 border-slate-200',
+        bar: 'bg-slate-500',
+    },
+};
+
+const RiskCard = ({ risk, score, reasons, tags }) => {
+    const { label, tone } = mapRisk(risk);
+    const toneCfg = toneClasses[tone] ?? toneClasses.neutral;
+    const safeScore = typeof score === 'number' ? Math.min(Math.max(score, 0), 100) : 0;
 
     return (
-        <div className={`p-6 rounded-2xl border ${config.border} ${config.bg} backdrop-blur-sm transition-all duration-300`}>
-            {/* Header */}
-            <div className="flex justify-between items-stretch mb-8">
-                <div className="flex flex-col justify-center">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className={`p-2 rounded-lg bg-black/40 ${config.border} border`}>
-                            <Icon className={`w-6 h-6 ${config.color}`} />
-                        </div>
-                        <h2 className="text-gray-400 text-sm font-bold uppercase tracking-widest">Risk Verdict</h2>
-                    </div>
-                    <div className={`text-3xl md:text-4xl font-black ${config.color} tracking-tight drop-shadow-lg`}>
-                        {risk.replace('_', ' ')}
+        <section
+            aria-label="Risk assessment result"
+            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+        >
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
+                <div>
+                    <h2 className="text-sm font-medium text-slate-700 mb-1">Risk verdict</h2>
+                    <div
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium border ${toneCfg.badge}`}
+                    >
+                        {label}
                     </div>
                 </div>
 
-                <div className="flex flex-col items-end justify-center pl-6 border-l border-white/5">
-                    <div className={`text-6xl font-mono font-black ${config.color} drop-shadow-[0_0_15px_rgba(0,0,0,0.5)]`}>
-                        {score}
-                    </div>
-                    <div className="text-sm text-gray-400 font-medium uppercase tracking-wide mt-1">Risk Score</div>
+                <div className="text-right">
+                    <p className="text-xs text-slate-500">Risk score (0–100)</p>
+                    <p className="text-3xl font-semibold text-slate-900">{safeScore}</p>
                 </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="w-full bg-black/20 rounded-full h-1.5 mb-6 overflow-hidden">
-                <div
-                    className={`h-full rounded-full ${config.bar} transition-all duration-1000 ease-out`}
-                    style={{ width: `${score}%` }}
-                ></div>
+            <div className="mt-2 mb-5">
+                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span>Lower is safer</span>
+                    <span>Higher risk</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                        className={`h-2 rounded-full ${toneCfg.bar}`}
+                        style={{ width: `${safeScore}%` }}
+                    />
+                </div>
             </div>
 
-            {/* Analysis */}
+            {tags && tags.length > 0 && (
+                <div className="mb-4">
+                    <p className="text-xs font-medium text-slate-700 mb-1">Key signals</p>
+                    <div className="flex flex-wrap gap-2">
+                        {tags.map((tag) => (
+                            <span
+                                key={tag}
+                                className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[11px] text-slate-700"
+                            >
+                                {tag}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div>
-                <h3 className="text-gray-300 text-sm font-semibold mb-3 flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 text-gray-500" />
-                    Analysis Report
-                </h3>
-                <ul className="space-y-2">
-                    {reasons.map((reason, index) => (
-                        <li key={index} className="flex items-start gap-3 text-sm text-gray-400 bg-black/20 p-3 rounded-lg border border-white/5">
-                            <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${config.bar}`}></span>
-                            <span className="leading-relaxed">{reason}</span>
-                        </li>
-                    ))}
-                </ul>
+                <p className="text-sm font-medium text-slate-800 mb-2">Why this risk?</p>
+                {reasons && reasons.length > 0 ? (
+                    <ul className="space-y-1.5 text-sm text-slate-700">
+                        {reasons.map((reason, index) => (
+                            <li key={index} className="flex gap-2">
+                                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-300" aria-hidden="true" />
+                                <span>{reason}</span>
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-slate-500">
+                        No specific risk factors were reported for this transaction.
+                    </p>
+                )}
             </div>
-        </div>
+        </section>
     );
 };
 

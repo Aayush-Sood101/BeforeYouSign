@@ -17,19 +17,19 @@
     border-radius: 12px;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     overflow: hidden;
-    border: 1px solid #374151;
+    border: 2px solid #374151; /* Will be overridden by inline style for semantic color */
 }
 
 .walletwork-header {
-    background: #7f1d1d;
     padding: 16px;
     text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Will be overridden by inline style */
 }
 
 .walletwork-header h2 {
     margin: 0;
-    color: #fecaca;
     font-size: 20px;
+    font-weight: 600;
 }
 
 .walletwork-body {
@@ -40,21 +40,25 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: #991b1b;
-    padding: 10px 15px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px 16px;
     border-radius: 8px;
     margin-bottom: 20px;
+    border: 2px solid #374151; /* Will be overridden by inline style */
 }
 
 .score {
-    font-size: 24px;
+    font-size: 28px;
     font-weight: bold;
 }
 
 .label {
     text-transform: uppercase;
     font-weight: bold;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
 }
 
 .walletwork-body ul {
@@ -66,10 +70,11 @@
 .walletwork-body li {
     background: #374151;
     margin-bottom: 8px;
-    padding: 10px;
+    padding: 12px;
     border-radius: 6px;
     font-size: 14px;
-    border-left: 4px solid #ef4444;
+    border-left: 3px solid #ef4444; /* Will be overridden by inline style */
+    line-height: 1.5;
 }
 
 .scam-alert {
