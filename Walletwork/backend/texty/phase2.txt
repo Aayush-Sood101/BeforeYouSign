@@ -1,0 +1,228 @@
+PHASE 2 — On-Chain Intelligence
+
+(What is actually happening here?)
+
+One-line purpose (memorize this)
+
+Phase 2 asks: “What does the blockchain itself reveal about this wallet and contract?”
+
+No opinions.
+No prior labels.
+Only objective on-chain facts.
+
+This phase does not decide guilt.
+It establishes context and credibility.
+
+Why Phase 2 exists at all
+
+If you skip Phase 2, you only have:
+
+Blacklists (Phase 1)
+
+Graph proximity (Phase 3)
+
+Heuristics (Phase 4)
+
+Judges will immediately ask:
+
+“What if the address is not yet blacklisted?”
+
+Phase 2 answers that.
+
+It catches new scams, fresh wallets, and suspicious contracts before they’re widely reported.
+
+What Phase 2 uses (important distinction)
+Inputs
+
+Wallet address
+
+Contract address
+
+Data sources
+
+Alchemy → raw blockchain data
+
+Etherscan → contract transparency & verification
+
+What it does NOT use
+
+❌ scam_db.json
+❌ graph logic
+❌ transaction simulation
+
+This is intentional.
+
+Phase 2 is split into TWO tracks
+Track A — Wallet Intelligence
+Track B — Contract Intelligence
+
+Let’s break them down.
+
+Track A — Wallet Intelligence
+
+This answers:
+
+“Who am I dealing with?”
+
+1️⃣ Wallet Transaction Count (Fresh Wallet Detection)
+
+What we check
+
+Number of transactions ever sent by the wallet
+
+Why this matters
+
+Scammers generate wallets instantly
+
+Fresh wallets have:
+
+No reputation
+
+No history
+
+No accountability
+
+Interpretation
+
+tx_count == 0 → Fresh Wallet
+
+Fresh ≠ scam, but high risk
+
+How you explain it to judges
+
+“Legitimate users accumulate transaction history over time. Scam operators frequently rotate brand-new wallets to avoid traceability.”
+
+2️⃣ Wallet Age (Implicit via history)
+
+We don’t need an explicit “creation date”.
+
+If a wallet has:
+
+Many past transactions
+
+Spread over time
+
+→ It’s less likely to be a throwaway scam wallet.
+
+This contributes to risk weighting, not a verdict.
+
+Track B — Contract Intelligence
+
+This answers:
+
+“What am I interacting with?”
+
+3️⃣ Is this a Contract or a Person?
+
+What we check
+
+Does bytecode exist at this address?
+
+Why
+
+EOAs (people) behave differently from contracts
+
+Contracts execute unavoidable code
+
+This matters for:
+
+Approve
+
+Swap
+
+Any programmable action
+
+4️⃣ Contract Age
+
+What we check
+
+How recently the contract appeared on-chain
+
+Why this matters
+
+Scam contracts are often:
+
+Deployed minutes or hours before attack
+
+Abandoned after draining funds
+
+Interpretation
+
+Very new contract → elevated risk
+
+Old contract → more trust (not guaranteed)
+
+5️⃣ Contract Verification (Etherscan)
+
+This is one of your strongest signals.
+
+What we check
+
+Is the contract source code verified on Etherscan?
+
+Why this matters
+
+Legitimate projects want transparency
+
+Scammers hide code intentionally
+
+Rule (clear and defensible)
+
+Unverified contract = HIGH RISK
+
+This is not opinion — it’s industry norm.
+
+Judge-friendly explanation
+
+“If the code isn’t public, users cannot audit what will happen when they interact with it. That lack of transparency itself is a risk signal.”
+
+What Phase 2 outputs (and what it DOESN’T)
+Phase 2 outputs signals, not a verdict
+
+Examples:
+
+Fresh Wallet
+
+Unverified Contract
+
+New Contract
+
+EOA vs Contract
+
+Each signal:
+
+Has meaning
+
+Adds weight
+
+Is explainable
+
+Phase 2 alone never says:
+
+“This is a scam.”
+
+It says:
+
+“These conditions increase uncertainty and risk.”
+
+How Phase 2 contributes to the final risk score
+
+Think of Phase 2 as risk multipliers, not triggers.
+
+Example logic (conceptual)
+
+Fresh wallet → +15
+
+Unverified contract → +25
+
+New contract → +10
+
+These numbers:
+
+Don’t ban
+
+Don’t block
+
+Just tilt the balance
+
+Later phases decide severity.

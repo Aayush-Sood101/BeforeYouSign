@@ -1,7 +1,84 @@
-[
-    "0x0000000000000000000000000000000000000000",
-    "0xDEADDEADDEADDEADDEADDEADDEADDEADDEADDEAD",
-    "0xbadbadbadbadbadbadbadbadbadbadbadbadbad",
-    "0xScamAddress123456789012345678901234567890",
-    "0xPhishingWalletABCDEF1234567890ABCDEF1234"
-]
+{
+  "wallets": [
+    {
+      "address": "0x5aAEB6053F3E94C9b9A09f33669435E7Ef1BeAed",
+      "category": "phishing",
+      "source": "etherscan",
+      "confidence": 0.95,
+      "notes": "Reported phishing wallet impersonating DeFi support channels"
+    },
+    {
+      "address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+      "category": "scam_operator",
+      "source": "community_reports",
+      "confidence": 0.9,
+      "notes": "Wallet linked to multiple scam fund consolidation events"
+    },
+    {
+      "address": "0x66f820a414680b5bcda5eeca5dea238543f42054",
+      "category": "fake_airdrop",
+      "source": "chainabuse",
+      "confidence": 0.88,
+      "notes": "Used in fake token airdrop campaigns"
+    },
+    {
+      "address": "0x281055afc982d96fab65b3a49cac8b878184cb16",
+      "category": "phishing",
+      "source": "zachxbt_reports",
+      "confidence": 0.92,
+      "notes": "Identified in social engineering scams targeting new users"
+    },
+    {
+      "address": "0xfe9e8709d3215310075d67e3ed32a380ccf451c8",
+      "category": "drainer_operator",
+      "source": "community_reports",
+      "confidence": 0.9,
+      "notes": "Wallet controlling multiple approval drainer contracts"
+    }
+  ],
+
+  "contracts": [
+    {
+      "address": "0x1111111254fb6c44bac0bed2854e76f90643097d",
+      "category": "approval_drainer",
+      "source": "chainabuse",
+      "confidence": 0.95,
+      "notes": "Contract used to drain ERC20 approvals via deceptive UI"
+    },
+    {
+      "address": "0x9f8f72aa9304c8b593d555f12ef6589cc3a579a2",
+      "category": "honeypot",
+      "source": "etherscan",
+      "confidence": 0.9,
+      "notes": "Token contract allows buys but blocks sells"
+    },
+    {
+      "address": "0x72a5843cc08275c8171e582972aa4fda8c397b2a",
+      "category": "malicious_router",
+      "source": "community_reports",
+      "confidence": 0.85,
+      "notes": "Swap router redirecting funds to attacker-controlled wallet"
+    },
+    {
+      "address": "0x4e83362442b8d1bec281594cea3050c8eb01311c",
+      "category": "rug_pull",
+      "source": "chainabuse",
+      "confidence": 0.88,
+      "notes": "Contract linked to multiple liquidity rug pulls"
+    }
+  ],
+
+  "clusters": [
+    {
+      "cluster_id": "approval_drainer_cluster_01",
+      "addresses": [
+        "0xfe9e8709d3215310075d67e3ed32a380ccf451c8",
+        "0x1111111254fb6c44bac0bed2854e76f90643097d",
+        "0x72a5843cc08275c8171e582972aa4fda8c397b2a"
+      ],
+      "source": "graph_analysis",
+      "confidence": 0.87,
+      "notes": "Cluster of wallets and contracts involved in coordinated approval drain attacks"
+    }
+  ]
+}

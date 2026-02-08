@@ -1,0 +1,154 @@
+You are a senior frontend engineer and security UX designer.
+
+I already have a working React + Tailwind UI for a Web3 security product called Walletwork.
+The current UI only shows a final verdict.
+
+Your task is to EXTEND the UI to display a DETAILED, EXPLAINABLE, STAGE-BY-STAGE SECURITY ANALYSIS.
+
+DO NOT redesign the whole UI.
+DO NOT remove the existing layout.
+EXTEND the right-hand “Results Panel” only.
+
+========================
+GOAL
+========================
+For every transaction analysis, the user must see:
+
+1. Each analysis phase
+2. What was checked in that phase
+3. The outcome of that phase
+4. How it contributed to the final risk score
+5. A final consolidated verdict
+
+This is meant for judges and security reviewers.
+Explainability is MORE IMPORTANT than visual flash.
+
+========================
+ANALYSIS PHASES TO DISPLAY
+========================
+
+PHASE 1 — Static Checks
+Label: “Static Validation”
+Checks:
+- Address format
+- Zero address / burn address
+- Known scam blacklist
+Output:
+- Status: PASS / FAIL
+- Short explanation in plain English
+
+PHASE 2 — On-Chain Intelligence
+Label: “On-Chain Signals”
+Checks:
+- Wallet transaction count (fresh wallet detection)
+- Contract age
+- Is contract vs EOA
+- Contract verification status (Etherscan)
+Output:
+- Signals shown as badges:
+  - “Fresh Wallet”
+  - “Unverified Contract”
+  - “New Contract”
+- Short explanation of why each signal matters
+
+PHASE 3 — Graph Intelligence
+Label: “Graph Risk Analysis”
+Checks:
+- Hop distance to known scam wallets
+- Direct or indirect exposure
+Output:
+- Hop distance visualized (0 Hop, 1 Hop, 2+ Hops)
+- Clear explanation:
+  “This wallet has directly interacted with a known scam address.”
+
+PHASE 4 — Transaction Simulation
+Label: “Transaction Impact Simulation”
+Checks:
+- Transaction type (Approve / Swap / Send)
+- Approval risk (unlimited allowance)
+- Historical drain patterns
+Output:
+- Drain probability (%)
+- Explanation of worst-case outcome
+- Highlight if approval enables future token drain
+
+========================
+FINAL VERDICT SECTION
+========================
+
+After all phases, show a FINAL SUMMARY CARD:
+
+- Final Risk Level: SAFE / CAUTION / DANGEROUS
+- Risk Score (0–100)
+- “Why this verdict?” section summarizing top 3 reasons
+- Clear recommendation:
+  - “Safe to proceed”
+  - “Proceed with caution”
+  - “Do NOT sign this transaction”
+
+========================
+UI BEHAVIOR REQUIREMENTS
+========================
+
+- Each phase should be collapsible (accordion-style)
+- Default state: expanded after analysis
+- Each phase should have:
+  - Title
+  - Status indicator (green / amber / red)
+  - Explanation text
+- Use icons and subtle color accents ONLY (no neon)
+
+========================
+DATA ASSUMPTIONS
+========================
+
+Assume backend response contains:
+
+{
+  risk_level,
+  risk_score,
+  reasons,
+  signals: {
+    is_new_wallet,
+    is_unverified_contract,
+    graph_hop_distance,
+    drain_probability,
+    contract_age_days
+  }
+}
+
+If some signals are missing, fail gracefully and display:
+“Data unavailable”
+
+========================
+DESIGN CONSTRAINTS
+========================
+
+- Dark theme (already exists)
+- Glassmorphism cards
+- Clean, calm, security-first tone
+- NO buzzwords
+- NO emojis
+- NO marketing language
+
+========================
+WHAT TO OUTPUT
+========================
+
+- Updated React JSX for the Results Panel
+- Reusable components:
+  - PhaseCard
+  - SignalBadge
+  - VerdictSummary
+- Tailwind classes inline (no external CSS)
+- Clear comments explaining structure
+
+IMPORTANT:
+This is a SECURITY EXPLANATION INTERFACE.
+The user must understand WHY a transaction is dangerous — not just that it is.
+
+Do not simplify.
+Do not hide technical truth.
+Do not remove existing functionality.
+
+Implement this carefully and cleanly.
