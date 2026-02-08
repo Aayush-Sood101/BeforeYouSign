@@ -116,7 +116,30 @@ async def analyze_transaction(request: AnalyzeRequest):
             }
 
         # ==========================================
-        # PHASE 2: Graph Analysis
+        # PHASE 1.5: Scam Intelligence Check (Static Validation)
+        # ==========================================
+        scam_intel_wallet = {}
+        scam_intel_contract = {}
+        
+        try:
+            # Check both wallet and contract against scam intelligence
+            scam_intel_wallet = graph_engine.check_scam_intelligence(request.wallet)
+            scam_intel_contract = graph_engine.check_scam_intelligence(request.contract)
+            
+            # Use contract intel as primary (more critical)
+            scam_intel = scam_intel_contract if scam_intel_contract.get("scam_match") else scam_intel_wallet
+        except Exception as e:
+            print(f"Error checking scam intelligence: {e}")
+            scam_intel = {
+                "scam_match": False,
+                "scam_category": None,
+                "scam_source": None,
+                "scam_confidence": None,
+                "cluster_id": None
+            }
+
+        # ==========================================
+        # PHASE 3: Graph Analysis
         # ==========================================
         graph_signals = {}
         try:
@@ -126,35 +149,51 @@ async def analyze_transaction(request: AnalyzeRequest):
             )
         except Exception as e:
             print(f"Error in graph analysis: {e}")
-            graph_signals = {"wallet_scam_distance": -1, "connected_to_scam_cluster": False}
+            graph_signals = {
+                "wallet_scam_distance": -1, 
+                "connected_to_scam_cluster": False,
+                "graph_explanation": "Graph analysis unavailable"
+            }
 
         # ==========================================
-        # PHASE 3: Fraud Simulation
+        # PHASE 4: Transaction Simulation
         # ==========================================
         forecast_signals = {}
         try:
             # Determine intermediate risk factors for simulation
             is_scam_linked = graph_signals.get("connected_to_scam_cluster", False)
+            is_direct_scam = scam_intel.get("scam_match", False)
             is_unverified = onchain_data.get("is_contract", False) and not onchain_data.get("contract_verified", False)
+            scam_category = scam_intel.get("scam_category")
+            scam_confidence = scam_intel.get("scam_confidence", 0.0)
             
             # Base contract risk score for simulation input
             contract_risk_score = 0
-            if is_unverified:
+            
+            if is_direct_scam:
+                contract_risk_score = 80
+                # Use category to amplify drain probability
+                if scam_category in ["approval_drainer", "drainer_operator"]:
+                    contract_risk_score = 95
+                # Apply confidence multiplier
+                contract_risk_score = int(contract_risk_score * scam_confidence) if scam_confidence else contract_risk_score
+            elif is_unverified:
                 contract_risk_score = 60
-            if is_scam_linked:
+            
+            if is_scam_linked and not is_direct_scam:
                 contract_risk_score += 30
                 
             forecast_signals = fraud_simulator.simulate_risk(
                 request.tx_type, 
                 contract_risk_score, 
-                is_scam_linked
+                is_scam_linked or is_direct_scam
             )
         except Exception as e:
             print(f"Error in simulation: {e}")
             forecast_signals = {"drain_probability": 0.0}
 
         # ==========================================
-        # PHASE 4: Final Risk Calculation
+        # PHASE 5: Final Risk Calculation
         # ==========================================
         result = calculate_risk(
             request.wallet, 
@@ -162,7 +201,8 @@ async def analyze_transaction(request: AnalyzeRequest):
             request.tx_type, 
             onchain_data,
             graph_signals,
-            forecast_signals
+            forecast_signals,
+            scam_intel  # NEW: Pass scam intelligence
         )
         
         return result
