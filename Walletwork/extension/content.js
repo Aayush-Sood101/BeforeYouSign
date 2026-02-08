@@ -21,11 +21,11 @@ window.addEventListener('message', async (event) => {
         const { payload, reqId } = event.data;
         const result = await analyzeTransaction(payload);
 
-        if (result.risk === 'SAFE' || result.risk === 'LOW') {
-            // Auto-proceed
+        if (result.risk === 'SAFE') {
+            // Auto-proceed for SAFE transactions
             window.postMessage({ type: 'WALLETWORK_DECISION', reqId, decision: 'PROCEED' }, '*');
         } else {
-            // Show UI Warning
+            // Show UI Warning for CAUTION and DANGEROUS
             showWarningModal(result, reqId);
         }
     }
@@ -38,11 +38,11 @@ async function analyzeTransaction(tx) {
         // tx.from -> wallet
         // tx.data -> we can check if it looks like approve (0x095ea7b3)
 
-        let txType = 'send';
+        let txType = 'transfer';
         if (tx.data && tx.data.startsWith('0x095ea7b3')) {
             txType = 'approve';
         } else if (tx.data && tx.data.length > 10) {
-            txType = 'swap'; // Basic heuristic
+            txType = 'swap'; // Basic heuristic for smart contract interaction
         }
 
         const response = await fetch('http://localhost:8000/analyze', {
@@ -57,37 +57,44 @@ async function analyzeTransaction(tx) {
         return await response.json();
     } catch (err) {
         console.error("Analysis Error:", err);
-        // Fail open or closed? Let's return error so it shows in logs but maybe let user decide?
-        // returning High Risk just to be safe if backend down
-        return { risk: 'HIGH_RISK', score: 99, reasons: ['Backend unreachable', err.toString()] };
+        // Fail closed: return DANGEROUS if backend unreachable (security-first approach)
+        return { risk: 'DANGEROUS', risk_score: 99, score: 99, reasons: ['Backend unreachable - cannot verify safety', err.toString()] };
     }
 }
 
 function showWarningModal(result, reqId) {
-    // Create Modal HTML
+    // Determine risk level color and icon
+    const isDangerous = result.risk === 'DANGEROUS';
+    const isCaution = result.risk === 'CAUTION';
+    
+    const riskColor = isDangerous ? '#ef4444' : isCaution ? '#f59e0b' : '#10b981';
+    const riskIcon = isDangerous ? '🔴' : isCaution ? '⚠️' : '✅';
+    const riskTitle = isDangerous ? 'DANGEROUS Transaction' : isCaution ? 'CAUTION Required' : 'Safe Transaction';
+    
+    // Create Modal HTML with semantic color-coding
     const modal = document.createElement('div');
     modal.className = 'walletwork-overlay';
     modal.innerHTML = `
-        <div class="walletwork-modal">
-            <div class="walletwork-header">
-                <h2>⚠️ High Risk Detected</h2>
+        <div class="walletwork-modal" style="border-color: ${riskColor};">
+            <div class="walletwork-header" style="background: ${riskColor}20; border-bottom-color: ${riskColor};">
+                <h2>${riskIcon} ${riskTitle}</h2>
             </div>
             <div class="walletwork-body">
-                <div class="score-box">
-                    <span class="score">${result.score}/100</span>
-                    <span class="label">${result.risk}</span>
+                <div class="score-box" style="border-color: ${riskColor};">
+                    <span class="score" style="color: ${riskColor};">${result.risk_score || result.score || 0}/100</span>
+                    <span class="label" style="background: ${riskColor}; color: white;">${result.risk}</span>
                 </div>
                 <ul>
-                    ${result.reasons.map(r => `<li>${r}</li>`).join('')}
+                    ${(result.reasons || []).map(r => `<li style="border-left-color: ${riskColor};">${r}</li>`).join('')}
                 </ul>
                 ${result.graph_signals?.connected_to_scam_cluster ?
-            '<div class="scam-alert">🚨 Connected to Scam Cluster!</div>' : ''}
+            '<div class="scam-alert">🚨 Connected to Known Scam Cluster!</div>' : ''}
                 ${result.forecast_signals?.drain_probability > 0.5 ?
             `<div class="forecast-alert">🔮 Drain Probability: ${Math.round(result.forecast_signals.drain_probability * 100)}%</div>` : ''}
             </div>
             <div class="walletwork-footer">
                 <button id="ww-reject" class="btn-reject">REJECT TRANSACTION</button>
-                <button id="ww-proceed" class="btn-proceed">I understand the risk, Proceed</button>
+                ${!isDangerous ? '<button id="ww-proceed" class="btn-proceed">I Understand the Risk, Proceed</button>' : ''}
             </div>
         </div>
     `;
@@ -96,12 +103,15 @@ function showWarningModal(result, reqId) {
 
     // Event Listeners
     document.getElementById('ww-reject').onclick = () => {
-        window.postMessage({ type: 'WALLETWORK_DECISION', reqId, decision: 'REJECT', reason: 'User rejected warning' }, '*');
+        window.postMessage({ type: 'WALLETWORK_DECISION', reqId, decision: 'REJECT', reason: 'User rejected transaction' }, '*');
         document.body.removeChild(modal);
     };
 
-    document.getElementById('ww-proceed').onclick = () => {
-        window.postMessage({ type: 'WALLETWORK_DECISION', reqId, decision: 'PROCEED' }, '*');
-        document.body.removeChild(modal);
-    };
+    const proceedBtn = document.getElementById('ww-proceed');
+    if (proceedBtn) {
+        proceedBtn.onclick = () => {
+            window.postMessage({ type: 'WALLETWORK_DECISION', reqId, decision: 'PROCEED' }, '*');
+            document.body.removeChild(modal);
+        };
+    }
 }
