@@ -100,8 +100,11 @@ def calculate_risk(wallet: str, contract: str, tx_type: str,
                 "contract_address_valid": contract_valid,
                 "wallet_is_burn_address": wallet_is_burn,
                 "contract_is_burn_address": contract_is_burn,
-                "is_new_wallet": False,
-                "is_unverified_contract": False,
+                "is_new_wallet": None,  # Not checked - invalid/burn address
+                "wallet_tx_count": None,
+                "is_unverified_contract": None,  # Not checked - invalid/burn address
+                "contract_is_smart_contract": None,
+                "contract_type": None,
                 "contract_age_days": None,
                 "scam_match": False,
                 "scam_category": None,
@@ -308,6 +311,9 @@ def calculate_risk(wallet: str, contract: str, tx_type: str,
             
             # On-chain signals
             "is_new_wallet": tx_count == 0,
+            "wallet_tx_count": tx_count if tx_count >= 0 else None,
+            "contract_is_smart_contract": is_contract,
+            "contract_type": onchain_data.get("contract_type", None),
             "is_unverified_contract": is_contract and is_verified is False,
             "contract_age_days": onchain_data.get("contract_age_days", None),
             

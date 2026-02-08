@@ -1,7 +1,8 @@
 import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from models import AnalyzeRequest, AnalyzeResponse, RiskSignals
+
+from models import AnalyzeRequest, AnalyzeResponse
 from risk_engine import calculate_risk
 from blockchain import BlockchainClient
 from etherscan import EtherscanClient
@@ -14,122 +15,113 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for browser extension and frontend
+# --------------------------------------
+# CORS (frontend + extension support)
+# --------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to specific domains
+    allow_origins=["*"],  # restrict in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize service clients
-try:
-    blockchain_client = BlockchainClient()
-    etherscan_client = EtherscanClient()
-    graph_engine = GraphEngine()
-    fraud_simulator = FraudSimulator()
-except Exception as e:
-    print(f"Warning: Failed to initialize some clients: {e}")
-    print("Continuing with degraded functionality...")
+# --------------------------------------
+# Service Clients
+# --------------------------------------
+blockchain_client = BlockchainClient()
+etherscan_client = EtherscanClient()
+graph_engine = GraphEngine()
+fraud_simulator = FraudSimulator()
 
+# --------------------------------------
+# Health Check
+# --------------------------------------
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for monitoring"""
     return {
         "status": "ok",
         "service": "Walletwork Pre-Transaction Firewall",
         "version": "1.0.0"
     }
 
+# --------------------------------------
+# Main Analysis Endpoint
+# --------------------------------------
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_transaction(request: AnalyzeRequest):
     """
-    Analyze transaction risk before signing.
-    
-    This endpoint combines multiple data sources:
-    - Alchemy: On-chain data (tx count, contract code, transfers)
-    - Etherscan: Contract verification status
-    - Graph Engine: Proximity to known scammers
-    - Simulation: Drain probability heuristics
-    
-    Returns a deterministic risk assessment with human-readable explanations.
+    Performs a multi-phase transaction risk analysis:
+
+    Phase 1: Static & Scam Intelligence
+    Phase 2: On-Chain Intelligence (Alchemy + Etherscan)
+    Phase 3: Graph Risk Analysis
+    Phase 4: Transaction Impact Simulation
+    Phase 5: Final Risk Scoring
     """
+
     try:
-        # ==========================================
-        # PHASE 1: Fetch On-Chain Data
-        # ==========================================
-        onchain_data = {}
-        
+        # ==================================================
+        # PHASE 2 — ON-CHAIN INTELLIGENCE
+        # ==================================================
         try:
-            # Fetch data concurrently for performance
             wallet_task = blockchain_client.get_tx_count(request.wallet)
-            contract_code_task = blockchain_client.get_contract_code(request.contract)
+            code_task = blockchain_client.get_contract_code(request.contract)
             transfers_task = blockchain_client.get_recent_transfers(request.wallet)
 
             tx_count, contract_code, recent_transfers = await asyncio.gather(
-                wallet_task, 
-                contract_code_task, 
+                wallet_task,
+                code_task,
                 transfers_task,
                 return_exceptions=True
             )
-            
-            # Handle potential errors in individual fetches
-            if isinstance(tx_count, Exception):
-                print(f"Error fetching tx count: {tx_count}")
-                tx_count = -1
-            if isinstance(contract_code, Exception):
-                print(f"Error fetching contract code: {contract_code}")
-                contract_code = "0x"
-            if isinstance(recent_transfers, Exception):
-                print(f"Error fetching transfers: {recent_transfers}")
-                recent_transfers = []
-            
-            is_contract = contract_code != "0x"
+
+            # Normalize failures
+            tx_count = None if isinstance(tx_count, Exception) else tx_count
+            contract_code = "0x" if isinstance(contract_code, Exception) else contract_code
+            recent_transfers = [] if isinstance(recent_transfers, Exception) else recent_transfers
+
+            # Contract detection
+            is_contract = bool(contract_code and contract_code != "0x" and len(contract_code) > 2)
+
             contract_verified = None
-            
-            # Only check verification for actual contracts
             if is_contract:
                 try:
                     contract_verified = await etherscan_client.check_contract_verified(request.contract)
-                except Exception as e:
-                    print(f"Error checking contract verification: {e}")
-                    contract_verified = None  # Unknown status
+                except Exception:
+                    contract_verified = None  # unknown, not unverified
 
             onchain_data = {
-                "tx_count": tx_count if not isinstance(tx_count, Exception) else -1,
+                "tx_count": tx_count,
                 "is_contract": is_contract,
                 "contract_verified": contract_verified,
                 "contract_type": "SMART_CONTRACT" if is_contract else "EOA",
-                "contract_age_days": None  # Could be calculated from Etherscan contract creation date
+                "contract_age_days": None
             }
-            
+
         except Exception as e:
-            print(f"Error in on-chain data fetching: {e}")
-            # Graceful degradation: continue with limited data
+            print(f"[Phase 2] On-chain data error: {e}")
             onchain_data = {
-                "tx_count": -1,
+                "tx_count": None,
                 "is_contract": False,
                 "contract_verified": None,
                 "contract_type": "UNKNOWN",
                 "contract_age_days": None
             }
+            recent_transfers = []
 
-        # ==========================================
-        # PHASE 1.5: Scam Intelligence Check (Static Validation)
-        # ==========================================
-        scam_intel_wallet = {}
-        scam_intel_contract = {}
-        
+        # ==================================================
+        # PHASE 1 — STATIC & SCAM INTELLIGENCE
+        # ==================================================
         try:
-            # Check both wallet and contract against scam intelligence
-            scam_intel_wallet = graph_engine.check_scam_intelligence(request.wallet)
-            scam_intel_contract = graph_engine.check_scam_intelligence(request.contract)
-            
-            # Use contract intel as primary (more critical)
-            scam_intel = scam_intel_contract if scam_intel_contract.get("scam_match") else scam_intel_wallet
+            wallet_intel = graph_engine.check_scam_intelligence(request.wallet)
+            contract_intel = graph_engine.check_scam_intelligence(request.contract)
+
+            # Contract intelligence is more critical
+            scam_intel = contract_intel if contract_intel.get("scam_match") else wallet_intel
+
         except Exception as e:
-            print(f"Error checking scam intelligence: {e}")
+            print(f"[Phase 1] Scam intelligence error: {e}")
             scam_intel = {
                 "scam_match": False,
                 "scam_category": None,
@@ -138,88 +130,89 @@ async def analyze_transaction(request: AnalyzeRequest):
                 "cluster_id": None
             }
 
-        # ==========================================
-        # PHASE 3: Graph Analysis
-        # ==========================================
-        graph_signals = {}
+        # ==================================================
+        # PHASE 3 — GRAPH RISK ANALYSIS
+        # ==================================================
         try:
             graph_signals = graph_engine.analyze_wallet_connections(
-                request.wallet, 
-                recent_transfers if 'recent_transfers' in locals() else []
+                request.wallet,
+                recent_transfers
             )
         except Exception as e:
-            print(f"Error in graph analysis: {e}")
+            print(f"[Phase 3] Graph analysis error: {e}")
             graph_signals = {
-                "wallet_scam_distance": -1, 
+                "wallet_scam_distance": None,
                 "connected_to_scam_cluster": False,
                 "graph_explanation": "Graph analysis unavailable"
             }
 
-        # ==========================================
-        # PHASE 4: Transaction Simulation
-        # ==========================================
-        forecast_signals = {}
+        # ==================================================
+        # PHASE 4 — TRANSACTION IMPACT SIMULATION
+        # ==================================================
         try:
-            # Determine intermediate risk factors for simulation
-            is_scam_linked = graph_signals.get("connected_to_scam_cluster", False)
             is_direct_scam = scam_intel.get("scam_match", False)
-            is_unverified = onchain_data.get("is_contract", False) and not onchain_data.get("contract_verified", False)
-            scam_category = scam_intel.get("scam_category")
-            scam_confidence = scam_intel.get("scam_confidence", 0.0)
-            
-            # Base contract risk score for simulation input
+            is_graph_exposed = graph_signals.get("connected_to_scam_cluster", False)
+
+            is_unverified_contract = (
+                onchain_data["is_contract"] is True and
+                onchain_data["contract_verified"] is False
+            )
+
             contract_risk_score = 0
-            
+
             if is_direct_scam:
                 contract_risk_score = 80
-                # Use category to amplify drain probability
-                if scam_category in ["approval_drainer", "drainer_operator"]:
+                if scam_intel.get("scam_category") in ["approval_drainer", "drainer_operator"]:
                     contract_risk_score = 95
-                # Apply confidence multiplier
-                contract_risk_score = int(contract_risk_score * scam_confidence) if scam_confidence else contract_risk_score
-            elif is_unverified:
+
+                confidence = scam_intel.get("scam_confidence")
+                if confidence:
+                    contract_risk_score = int(contract_risk_score * confidence)
+
+            elif is_unverified_contract:
                 contract_risk_score = 60
-            
-            if is_scam_linked and not is_direct_scam:
+
+            if is_graph_exposed and not is_direct_scam:
                 contract_risk_score += 30
-                
+
             forecast_signals = fraud_simulator.simulate_risk(
-                request.tx_type, 
-                contract_risk_score, 
-                is_scam_linked or is_direct_scam
+                request.tx_type,
+                contract_risk_score,
+                is_direct_scam or is_graph_exposed
             )
+
         except Exception as e:
-            print(f"Error in simulation: {e}")
+            print(f"[Phase 4] Simulation error: {e}")
             forecast_signals = {"drain_probability": 0.0}
 
-        # ==========================================
-        # PHASE 5: Final Risk Calculation
-        # ==========================================
+        # ==================================================
+        # PHASE 5 — FINAL RISK CALCULATION
+        # ==================================================
         result = calculate_risk(
-            request.wallet, 
-            request.contract, 
-            request.tx_type, 
-            onchain_data,
-            graph_signals,
-            forecast_signals,
-            scam_intel  # NEW: Pass scam intelligence
+            wallet=request.wallet,
+            contract=request.contract,
+            tx_type=request.tx_type,
+            onchain_data=onchain_data,
+            graph_signals=graph_signals,
+            forecast_signals=forecast_signals,
+            scam_intel=scam_intel
         )
-        
+
         return result
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Unexpected error analyzing transaction: {e}")
         import traceback
         traceback.print_exc()
-        
-        # Return a safe default response instead of crashing
         raise HTTPException(
-            status_code=500, 
-            detail=f"Analysis failed: {str(e)}. Please try again or contact support."
+            status_code=500,
+            detail=f"Analysis failed: {str(e)}"
         )
 
+# --------------------------------------
+# Local Dev Runner
+# --------------------------------------
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

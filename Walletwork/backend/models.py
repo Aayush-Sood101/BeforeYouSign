@@ -29,9 +29,12 @@ class RiskSignals(BaseModel):
     wallet_is_burn_address: bool = Field(..., description="True if wallet is a known burn address")
     contract_is_burn_address: bool = Field(..., description="True if contract is a known burn address")
     
-    # On-chain signals
-    is_new_wallet: bool = Field(..., description="True if wallet has 0 transactions")
-    is_unverified_contract: bool = Field(..., description="True if contract source not verified")
+    # On-chain signals (None = not checked due to validation failure)
+    is_new_wallet: Optional[bool] = Field(..., description="True if wallet has 0 transactions, None if not checked")
+    wallet_tx_count: Optional[int] = Field(None, description="Wallet transaction count from Alchemy")
+    is_unverified_contract: Optional[bool] = Field(..., description="True if contract source not verified, None if not checked")
+    contract_is_smart_contract: Optional[bool] = Field(None, description="True if address is a smart contract (from Alchemy bytecode check)")
+    contract_type: Optional[str] = Field(None, description="Contract type: SMART_CONTRACT or EOA (Externally Owned Account)")
     contract_age_days: Optional[int] = Field(None, description="Contract age in days, if applicable")
     
     # Scam intelligence signals (PHASE 1: Static Validation)

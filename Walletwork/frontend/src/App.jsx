@@ -462,71 +462,185 @@ export default function App() {
                   title="On-Chain Intelligence"
                   description="Blockchain history and contract verification"
                   status={
-                    result.signals?.is_new_wallet || result.signals?.is_unverified_contract 
-                      ? "WARNING" 
-                      : "PASS"
+                    // If on-chain checks weren't performed (burn/invalid address), show N/A
+                    result.signals?.is_new_wallet === null || result.signals?.is_unverified_contract === null
+                      ? "N/A"
+                      : result.signals?.is_new_wallet || (result.signals?.contract_is_smart_contract && result.signals?.is_unverified_contract)
+                        ? "WARNING" 
+                        : "PASS"
                   }
                   expanded={expandedPhases.phase2}
                   onToggle={() => togglePhase('phase2')}
                 >
-                  <div className="space-y-3">
-                    {/* Signal Badges */}
-                    <div className="flex flex-wrap gap-2">
-                      {result.signals?.is_new_wallet && (
-                        <SignalBadge 
-                          label="Fresh Wallet" 
-                          severity="high"
-                          tooltip="Wallet has 0 previous transactions. High risk of being a scammer-generated address."
-                        />
-                      )}
-                      {result.signals?.is_unverified_contract && (
-                        <SignalBadge 
-                          label="Unverified Contract" 
-                          severity="high"
-                          tooltip="Contract source code not published on Etherscan. Cannot audit for malicious logic."
-                        />
-                      )}
-                      {result.signals?.contract_age_days !== null && result.signals?.contract_age_days < 30 && (
-                        <SignalBadge 
-                          label="New Contract" 
-                          severity="medium"
-                          tooltip={`Contract deployed ${result.signals.contract_age_days} days ago. Recently deployed contracts require extra caution.`}
-                        />
-                      )}
-                      {!result.signals?.is_new_wallet && !result.signals?.is_unverified_contract && (
-                        <SignalBadge 
-                          label="Established Address" 
-                          severity="low"
-                          tooltip="Address has transaction history and appears legitimate"
-                        />
-                      )}
+                  {/* Show skip message if on-chain checks not performed */}
+                  {(result.signals?.is_new_wallet === null || result.signals?.is_unverified_contract === null) ? (
+                    <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3">
+                      <p className="text-xs text-gray-400 leading-relaxed">
+                        ⚠️ On-chain verification skipped due to invalid or burn address detected in Phase 1. 
+                        Blockchain API calls cannot be performed on invalid addresses.
+                      </p>
                     </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Signal Badges */}
+                      <div className="flex flex-wrap gap-2">
+                        {result.signals?.is_new_wallet && (
+                          <SignalBadge 
+                            label="Fresh Wallet" 
+                            severity="high"
+                            tooltip="Wallet has 0 previous transactions. High risk of being a scammer-generated address."
+                          />
+                        )}
+                        {result.signals?.contract_is_smart_contract && result.signals?.is_unverified_contract && (
+                          <SignalBadge 
+                            label="Unverified Contract" 
+                            severity="high"
+                            tooltip="Contract source code not published on Etherscan. Cannot audit for malicious logic."
+                          />
+                        )}
+                        {result.signals?.contract_age_days !== null && result.signals?.contract_age_days < 30 && (
+                          <SignalBadge 
+                            label="New Contract" 
+                            severity="medium"
+                            tooltip={`Contract deployed ${result.signals.contract_age_days} days ago. Recently deployed contracts require extra caution.`}
+                          />
+                        )}
+                        {result.signals?.wallet_tx_count !== null && result.signals.wallet_tx_count > 5 && (
+                          <SignalBadge 
+                            label="Established Wallet" 
+                            severity="low"
+                            tooltip="Wallet has significant transaction history indicating legitimate usage"
+                          />
+                        )}
+                      </div>
 
-                    {/* Detailed Explanations */}
-                    <div className="space-y-2">
-                      <DetailRow 
-                        label="Transaction History"
-                        value={result.signals?.is_new_wallet ? "0 transactions (Fresh Wallet)" : "Has transaction history"}
-                        explanation="Fresh wallets are commonly used by scammers to hide their identity. Every new wallet should be treated with high suspicion."
-                      />
-                      <DetailRow 
-                        label="Contract Verification"
-                        value={result.signals?.is_unverified_contract ? "Not Verified" : "Verified on Etherscan"}
-                        explanation={
-                          result.signals?.is_unverified_contract 
-                            ? "Unverified contracts hide their source code. Legitimate projects always verify to build trust."
-                            : "Contract source code is publicly auditable on Etherscan."
-                        }
-                      />
-                      {result.signals?.contract_age_days !== null && (
-                        <DetailRow 
-                          label="Contract Age"
-                          value={`${result.signals.contract_age_days} days`}
-                          explanation="Newer contracts have less historical data for risk assessment. Established contracts are generally more trustworthy."
-                        />
-                      )}
+                      {/* Detailed Explanations */}
+                      <div className="space-y-2">
+                        {/* Wallet Transaction History */}
+                        <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                              <span className="text-xs font-semibold text-gray-300">Wallet Transaction History</span>
+                            </div>
+                            <span className="text-xs font-mono text-white">
+                              {result.signals?.wallet_tx_count !== null && result.signals?.wallet_tx_count !== undefined 
+                                ? `${result.signals.wallet_tx_count} txns` 
+                                : "Unknown"}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] text-gray-400 leading-relaxed">
+                              <span className="text-purple-400 font-semibold">🔍 Alchemy API Response:</span> Wallet has {result.signals?.wallet_tx_count || 0} total transactions on the blockchain.
+                            </p>
+                            {result.signals?.wallet_tx_count === 0 ? (
+                              <p className="text-[10px] text-orange-400 leading-relaxed">
+                                ⚠️ <span className="font-semibold">Risk Assessment:</span> This wallet has no prior transaction history. Scam operators often use newly created wallets to avoid traceability. This increases baseline risk.
+                              </p>
+                            ) : result.signals?.wallet_tx_count !== null && result.signals.wallet_tx_count >= 1 && result.signals.wallet_tx_count <= 5 ? (
+                              <p className="text-[10px] text-gray-400 leading-relaxed">
+                                ℹ️ <span className="font-semibold">Risk Assessment:</span> Light transaction history. This wallet has minimal activity. Legitimate users typically have more extensive transaction patterns over time.
+                              </p>
+                            ) : result.signals?.wallet_tx_count !== null && result.signals.wallet_tx_count > 5 ? (
+                              <p className="text-[10px] text-green-400 leading-relaxed">
+                                ✓ <span className="font-semibold">Risk Assessment:</span> Established wallet with significant transaction history. More likely to be a legitimate user.
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-gray-400 leading-relaxed">
+                                ℹ️ <span className="font-semibold">Risk Assessment:</span> Transaction data unavailable.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Contract Verification */}
+                        <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              <span className="text-xs font-semibold text-gray-300">Contract Verification</span>
+                            </div>
+                            <span className={`text-xs font-mono ${
+                              result.signals?.contract_is_smart_contract === false ? "text-gray-500" :
+                              result.signals?.is_unverified_contract ? "text-red-400" : "text-green-400"
+                            }`}>
+                              {result.signals?.contract_is_smart_contract === false 
+                                ? "EOA" 
+                                : result.signals?.is_unverified_contract 
+                                  ? "Not Verified" 
+                                  : "Verified"}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] text-gray-400 leading-relaxed">
+                              <span className="text-blue-400 font-semibold">🔍 Alchemy API Response:</span> Contract address is {result.signals?.contract_is_smart_contract ? "a smart contract" : "an EOA (Externally Owned Account, regular wallet)"}.
+                            </p>
+                            {result.signals?.contract_is_smart_contract && (
+                              <p className="text-[10px] text-gray-400 leading-relaxed">
+                                <span className="text-blue-400 font-semibold">🔍 Etherscan API Response:</span> Contract source code is {result.signals?.is_unverified_contract ? "NOT publicly verified" : "verified and publicly auditable"}.
+                              </p>
+                            )}
+                            {result.signals?.contract_is_smart_contract === false ? (
+                              <p className="text-[10px] text-gray-400 leading-relaxed">
+                                ℹ️ <span className="font-semibold">Assessment:</span> This address is a regular wallet, not a smart contract. Contract-level risks do not apply. Verification check not applicable for EOAs.
+                              </p>
+                            ) : result.signals?.contract_is_smart_contract && result.signals?.is_unverified_contract ? (
+                              <p className="text-[10px] text-red-400 leading-relaxed">
+                                ⚠️ <span className="font-semibold">Risk Assessment:</span> Unverified smart contract. Source code is not publicly available on Etherscan, making it impossible to audit for malicious logic. Legitimate projects verify their contracts to build trust.
+                              </p>
+                            ) : result.signals?.contract_is_smart_contract && result.signals?.is_unverified_contract === false ? (
+                              <p className="text-[10px] text-green-400 leading-relaxed">
+                                ✓ <span className="font-semibold">Risk Assessment:</span> Verified smart contract. Source code is publicly available on Etherscan for review and audit.
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-gray-400 leading-relaxed">
+                                ℹ️ <span className="font-semibold">Status:</span> Contract verification data unavailable.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Contract Age (if available) */}
+                        {result.signals?.contract_age_days !== null && (
+                          <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-4 h-4 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-xs font-semibold text-gray-300">Contract Age</span>
+                              </div>
+                              <span className={`text-xs font-mono ${result.signals.contract_age_days < 30 ? "text-yellow-400" : "text-green-400"}`}>
+                                {result.signals.contract_age_days} days
+                              </span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] text-gray-400 leading-relaxed">
+                                <span className="text-cyan-400 font-semibold">🔍 Etherscan Data:</span> Contract was deployed approximately {result.signals.contract_age_days} days ago.
+                              </p>
+                              {result.signals.contract_age_days < 7 ? (
+                                <p className="text-[10px] text-orange-400 leading-relaxed">
+                                  ⚠️ <span className="font-semibold">Risk Assessment:</span> Very new contract (under 1 week old). Extreme caution advised - scammers often deploy fresh contracts to avoid reputation damage.
+                                </p>
+                              ) : result.signals.contract_age_days < 30 ? (
+                                <p className="text-[10px] text-yellow-400 leading-relaxed">
+                                  ⚠️ <span className="font-semibold">Risk Assessment:</span> Recently deployed contract. Less historical data available for risk assessment. Exercise caution.
+                                </p>
+                              ) : (
+                                <p className="text-[10px] text-green-400 leading-relaxed">
+                                  ✓ <span className="font-semibold">Risk Assessment:</span> Established contract with sufficient age. Longer contract lifespans generally indicate more trustworthy projects.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </PhaseCard>
 
                 {/* ============================================ */}
