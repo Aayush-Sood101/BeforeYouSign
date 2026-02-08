@@ -518,34 +518,67 @@ async function sendToGemini(prompt, metadata = {}) {
  * @returns {Object} Parsed analysis object
  */
 function parseGeminiResponse(responseText) {
+  // Handle empty or null response
+  if (!responseText || responseText.length === 0) {
+    log.error('Empty response received from Gemini');
+    return {
+      parseError: true,
+      error: 'Empty response received from Gemini',
+      rawResponse: '',
+      discrepancies: [],
+      vulnerabilities: [],
+      codeQualityIssues: [],
+      tokenomicsVerification: {},
+      riskScore: { overall: 0, classification: 'UNKNOWN', confidence: 'NONE' },
+      summary: 'No response received from AI.',
+      redFlags: ['Empty AI response - retry recommended'],
+      positiveAspects: []
+    };
+  }
+
   try {
     let cleaned = responseText.trim();
     
     log.info('Attempting to parse Gemini response', {
       originalLength: responseText.length,
-      first100Chars: responseText.substring(0, 100)
+      first100Chars: responseText.substring(0, 100),
+      last100Chars: responseText.substring(Math.max(0, responseText.length - 100))
     });
     
-    // Remove markdown code blocks if present (handle various formats)
-    // Handle ```json ... ```
-    cleaned = cleaned.replace(/^```json\s*\n?/i, '').replace(/\n?```\s*$/i, '');
-    // Handle ``` ... ```
-    cleaned = cleaned.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '');
+    // Step 1: Remove all types of markdown code blocks
+    // Pattern 1: ```json\n...\n```
+    // Pattern 2: ```\n...\n```
+    // Pattern 3: Nested or multiple code blocks
+    cleaned = cleaned.replace(/```json\s*/gi, '');
+    cleaned = cleaned.replace(/```\s*/g, '');
     
-    // Remove any leading/trailing whitespace again
-    cleaned = cleaned.trim();
-    
-    // Try to find the outermost JSON object braces
+    // Step 2: Remove any text before the first { and after the last }
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+      log.error('No valid JSON structure found in response', {
+        firstBrace,
+        lastBrace,
+        cleanedPreview: cleaned.substring(0, 500)
+      });
+      throw new Error('No JSON object found in response');
     }
+    
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    
+    // Step 3: Fix common JSON issues that Gemini might introduce
+    // Remove trailing commas before } or ]
+    cleaned = cleaned.replace(/,\s*([\]}])/g, '$1');
+    
+    // Remove any comments (// or /* */)
+    cleaned = cleaned.replace(/\/\/[^\n]*/g, '');
+    cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
     
     log.info('Cleaned response for parsing', {
       cleanedLength: cleaned.length,
-      first100Chars: cleaned.substring(0, 100)
+      first100Chars: cleaned.substring(0, 100),
+      last50Chars: cleaned.substring(Math.max(0, cleaned.length - 50))
     });
     
     // Parse JSON
@@ -806,10 +839,28 @@ async function analyzeWithGemini(pdfData, githubData) {
     log.info('Analysis prompt built', { promptLength: prompt.length });
     
     // Step 2: Send to Gemini
-    const responseText = await sendToGemini(prompt);
+    const responseText = await sendToGemini(prompt, {
+      repository: githubData.metadata?.repository,
+      pdfFile: pdfData.metadata?.fileName,
+      analysisMode: 'full'
+    });
+    
+    // Log raw response length for debugging
+    log.info('Raw response received for parsing', {
+      responseLength: responseText?.length || 0,
+      isEmpty: !responseText || responseText.length === 0
+    });
     
     // Step 3: Parse the response
     const geminiAnalysis = parseGeminiResponse(responseText);
+    
+    // If parsing failed, log additional info
+    if (geminiAnalysis.parseError) {
+      log.error('PARSE ERROR - Raw response preview:', {
+        first500: responseText?.substring(0, 500),
+        last500: responseText?.substring(Math.max(0, responseText.length - 500))
+      });
+    }
     
     // Step 4: Structure the final output
     const result = {
@@ -846,7 +897,10 @@ async function analyzeWithGemini(pdfData, githubData) {
         riskScore: geminiAnalysis.riskScore || { overall: 0, classification: 'UNKNOWN' },
         summary: geminiAnalysis.summary || 'Analysis completed.',
         redFlags: geminiAnalysis.redFlags || [],
-        positiveAspects: geminiAnalysis.positiveAspects || []
+        positiveAspects: geminiAnalysis.positiveAspects || [],
+        // Include raw response if parsing failed for debugging
+        rawResponse: geminiAnalysis.parseError ? responseText : undefined,
+        parseError: geminiAnalysis.parseError || false
       },
       
       finalVerdict: {
