@@ -1,0 +1,148 @@
+PHASE 4 — TRANSACTION IMPACT SIMULATION
+---------------------------------------
+“What happens if the user signs this transaction?”
+
+Phase 4 is the most critical phase.  
+It turns analysis into prevention.
+
+While earlier phases analyze WHO you are interacting with,
+Phase 4 analyzes WHAT POWER you are about to grant.
+
+---------------------------------------
+1. CORE PURPOSE
+Phase 4 answers a forward-looking question:
+
+“If this transaction is signed, what is the worst-case outcome?”
+
+This is necessary because:
+- Blockchain transactions are permission-granting
+- Damage often happens AFTER approval, not immediately
+- Explorers only show the past; Walletwork predicts future abuse
+
+---------------------------------------
+2. WHAT PHASE 4 IS (CONCEPTUALLY)
+Phase 4 is a risk simulation engine.
+
+It does NOT:
+- Execute the transaction
+- Simulate EVM bytecode
+- Predict exact losses
+
+It DOES:
+- Simulate security consequences
+- Estimate likelihood of fund drain
+- Explain how the transaction could be abused
+
+This keeps the system deterministic and explainable.
+
+---------------------------------------
+3. INPUTS USED BY PHASE 4
+Phase 4 consumes signals from earlier phases:
+
+From Phase 1:
+- Known scam match
+- Scam category (e.g., approval drainer)
+
+From Phase 2:
+- Contract type (EOA vs smart contract)
+- Contract verification status
+
+From Phase 3:
+- Graph exposure to scam clusters
+
+From User Input:
+- Transaction type (APPROVE / SWAP / SEND)
+
+---------------------------------------
+4. TRANSACTION TYPE RISK MODEL
+Each transaction type has a different risk ceiling:
+
+APPROVE:
+- Highest risk
+- Grants future permission
+- Enables silent draining later
+- Most common scam vector
+
+SWAP:
+- Medium risk
+- Funds leave immediately
+- Risks include fake tokens, honeypots, bad pricing
+
+SEND:
+- Lower risk
+- One-time transfer
+- No future permissions granted
+
+---------------------------------------
+5. CONTRACT RISK SCORING (INTERNAL)
+Phase 4 derives a contract risk score based on context:
+
+- Known scam contract: high risk
+- Approval drainer category: critical risk
+- Unverified contract: elevated risk
+- Graph exposure: risk amplification
+
+This score is NOT final.
+It is an input to the simulation engine.
+
+---------------------------------------
+6. SIMULATION OUTPUTS
+Phase 4 produces three outputs:
+
+1) Drain Probability (%)
+An estimated likelihood that signing this transaction
+could result in fund loss, based on historical abuse patterns.
+
+2) Worst-Case Outcome (Plain English)
+A human-readable explanation of what the transaction enables.
+
+Example (APPROVE):
+“This approval allows the contract to transfer your tokens at any time
+in the future, potentially draining your wallet without further consent.”
+
+3) Security Recommendation
+Clear guidance:
+- Safe to proceed
+- Proceed with caution
+- Do NOT sign this transaction
+
+---------------------------------------
+7. WHY PHASE 4 CAN OVERRIDE OTHER PHASES
+Even if:
+- Wallet is established
+- No graph exposure exists
+
+Phase 4 can still block a transaction if:
+- An approval grants excessive power
+- The contract is unverified
+- Historical drain patterns match
+
+This is why Walletwork is a firewall, not an explorer.
+
+---------------------------------------
+8. ROLE IN FINAL VERDICT
+Phase 4 is often the deciding factor.
+
+Typical influence:
+- Approve + scam signals → DANGEROUS
+- Approve + unverified contract → CAUTION / HIGH RISK
+- Swap + unknown contract → CAUTION
+- Send + clean EOA → usually SAFE
+
+Final verdict is computed by combining all phases,
+but Phase 4 determines real-world impact.
+
+---------------------------------------
+9. HOW TO EXPLAIN TO JUDGES (SCRIPT)
+“Phase 4 simulates the security consequences of signing a transaction.
+Instead of predicting execution, we estimate what power the signature grants
+and how that power is commonly abused in real scams.
+This allows us to block dangerous transactions before damage occurs.”
+
+---------------------------------------
+FINAL TAKEAWAY
+Phase 4 transforms blockchain analysis into prevention.
+
+It answers:
+“Not just is this suspicious,
+but what can go wrong if the user signs right now?”
