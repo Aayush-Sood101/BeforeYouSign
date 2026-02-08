@@ -1,5 +1,5 @@
 from pydantic import BaseModel, validator, Field
-from typing import List, Literal
+from typing import List, Literal, Optional, Dict, Any
 
 class AnalyzeRequest(BaseModel):
     wallet: str
@@ -16,6 +16,8 @@ class AnalyzeRequest(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     risk: str
-    score: int
     reasons: List[str]
+    onchain_signals: Optional[Dict[str, Any]] = None
+    graph_signals: Optional[Dict[str, Any]] = None
+    forecast_signals: Optional[Dict[str, Any]] = None
     timestamp: str
