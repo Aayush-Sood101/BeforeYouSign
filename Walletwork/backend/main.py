@@ -157,6 +157,12 @@ async def analyze_transaction(request: AnalyzeRequest):
                 onchain_data["is_contract"] is True and
                 onchain_data["contract_verified"] is False
             )
+            
+            # Check if contract verification is unknown (None = couldn't verify)
+            is_verification_unknown = (
+                onchain_data["is_contract"] is True and
+                onchain_data["contract_verified"] is None
+            )
 
             contract_risk_score = 0
 
@@ -170,7 +176,13 @@ async def analyze_transaction(request: AnalyzeRequest):
                     contract_risk_score = int(contract_risk_score * confidence)
 
             elif is_unverified_contract:
-                contract_risk_score = 60
+                # Unverified is a yellow flag, not red flag
+                # Many legitimate contracts are unverified
+                contract_risk_score = 35
+                
+            elif is_verification_unknown:
+                # Couldn't check verification - slight caution
+                contract_risk_score = 15
 
             if is_graph_exposed and not is_direct_scam:
                 contract_risk_score += 30

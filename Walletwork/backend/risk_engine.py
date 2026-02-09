@@ -172,11 +172,11 @@ def calculate_risk(wallet: str, contract: str, tx_type: str,
     # ==========================================
     tx_count = onchain_data.get("tx_count", -1)
     if tx_count == 0:
-        score += 30
+        score += 20
         reasons.append("This is a brand new wallet with zero transaction history")
     elif tx_count > 0 and tx_count < 3:
-        score += 15
-        reasons.append("Very low activity wallet (fewer than 3 transactions)")
+        score += 5  # Very minor penalty - many legit users have low tx count
+        reasons.append("Low activity wallet (fewer than 3 transactions)")
 
     # ==========================================
     # SIGNAL 2: Contract Verification
@@ -186,7 +186,7 @@ def calculate_risk(wallet: str, contract: str, tx_type: str,
     
     if is_contract:
         if is_verified is False:
-            score += 35
+            score += 20  # Reduced from 35 - unverified is yellow flag, not red
             reasons.append("Contract source code is NOT verified on Etherscan")
         elif is_verified is True:
             reasons.append("Contract is verified on Etherscan")
@@ -229,24 +229,28 @@ def calculate_risk(wallet: str, contract: str, tx_type: str,
     drain_prob = forecast_signals.get("drain_probability", 0.0)
     
     if tx_type == "approve":
-        base_penalty = 25
+        # Base penalty for approve - minimal if no other risk factors
+        base_penalty = 5  # Reduced from 25 - approve itself isn't dangerous
         
         # Amplify if contract is approval_drainer category
         if scam_category == "approval_drainer":
-            base_penalty += 20
+            base_penalty += 40
             reasons.append("⚠️ CRITICAL: Contract flagged as approval drainer - will steal tokens after approval")
         else:
             reasons.append("ERC20 Approve detected - grants spending permission to contract")
         
         score += base_penalty
         
-        # Drain probability
+        # Drain probability - only add significant penalty if probability is high
         if drain_prob >= 0.8:
-            score += 25
+            score += 30
             reasons.append(f"Extremely high drain risk ({int(drain_prob*100)}% probability)")
         elif drain_prob >= 0.5:
-            score += 15
+            score += 20
             reasons.append(f"Elevated drain risk ({int(drain_prob*100)}% probability)")
+        elif drain_prob >= 0.3:
+            score += 10
+            reasons.append(f"Moderate drain risk ({int(drain_prob*100)}% probability)")
             
     elif tx_type == "swap":
         base_penalty = 10
