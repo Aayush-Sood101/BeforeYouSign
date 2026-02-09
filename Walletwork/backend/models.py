@@ -73,4 +73,5 @@ class AnalyzeResponse(BaseModel):
     onchain_signals: Optional[Dict[str, Any]] = None
     graph_signals: Optional[Dict[str, Any]] = None
     forecast_signals: Optional[Dict[str, Any]] = None
+    scam_intel: Optional[Dict[str, Any]] = None
     timestamp: str = Field(..., description="ISO timestamp of analysis")
