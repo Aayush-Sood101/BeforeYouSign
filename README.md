@@ -929,6 +929,99 @@ python debug_risk.py    # Manual risk debugging
 ### Frontend
 ```bash
 cd frontend
+npm run test         # Run tests (if configured)
+npm run lint         # ESLint checks
+```
+
+---
+
+## 🚀 Deployment
+
+### Production Deployment Guide
+
+For deploying BeforeYouSign to production, see our comprehensive guides:
+
+- **📘 [DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md)** - Complete step-by-step deployment guide
+- **⚡ [QUICK-DEPLOY.md](./QUICK-DEPLOY.md)** - Quick reference checklist
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    PRODUCTION ARCHITECTURE                   │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Frontend (Vercel)                                           │
+│  ├─ Next.js 16 with React 19                                │
+│  ├─ Global CDN                                               │
+│  ├─ Automatic HTTPS                                          │
+│  └─ Environment Variables (Clerk, API URLs)                 │
+│                                                              │
+│  Smart Contract Analyzer Backend (Render)                   │
+│  ├─ Node.js/Express                                          │
+│  ├─ File uploads (Multer)                                    │
+│  ├─ Gemini AI integration                                    │
+│  └─ Environment Variables (Gemini, GitHub)                  │
+│                                                              │
+│  Walletwork Backend (Render)                                │
+│  ├─ Python/FastAPI                                           │
+│  ├─ Alchemy + Etherscan APIs                                │
+│  ├─ NetworkX graph analysis                                 │
+│  └─ Environment Variables (Alchemy, Etherscan)             │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Quick Deployment Steps
+
+1. **Deploy Backends to Render**
+   ```bash
+   # Both backends deploy from GitHub repository
+   # Configure root directories and environment variables
+   ```
+
+2. **Deploy Frontend to Vercel**
+   ```bash
+   vercel --prod
+   # Or connect via Vercel Dashboard
+   ```
+
+3. **Configure Environment Variables**
+   - Update `NEXT_PUBLIC_CONTRACT_ANALYZER_API_URL`
+   - Update `NEXT_PUBLIC_WALLETWORK_API_URL`
+   - Set all required API keys
+
+4. **Test Deployment**
+   ```bash
+   curl https://your-contract-analyzer.onrender.com/health
+   curl https://your-walletwork.onrender.com/health
+   ```
+
+For detailed instructions, see [DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md).
+
+---
+
+## 🧪 Testing
+
+### Smart Contract Agent Tests
+```bash
+cd smart-contract-agent
+npm run test:all        # Run all tests
+npm run test:pdf        # PDF parser tests only
+npm run test            # Gemini analyzer tests
+```
+
+### Wallet Risk Engine Tests
+```bash
+cd Walletwork/backend
+pytest test_api.py      # API endpoint tests
+pytest test_integration.py  # Integration tests
+python debug_risk.py    # Manual risk debugging
+```
+
+### Frontend
+```bash
+cd frontend
 npm run lint            # ESLint
 npm run build           # Production build check
 ```
