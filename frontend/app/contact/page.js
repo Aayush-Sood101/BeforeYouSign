@@ -1,6 +1,7 @@
 "use client";
 import { motion } from "framer-motion";
 import ContactForm from "./ContactForm";
+import { WebcamPixelGrid } from "../components/webcam-pixel.grid";
 
 // ✨ CHANGED: Animation variants for a staggered effect
 const containerVariants = {
@@ -30,7 +31,29 @@ const itemVariants = {
 
 export default function ContactPage() {
   return (
-    <div class='py-30'>
+    <div className='relative py-30'>
+      {/* Webcam Pixel Grid Background */}
+      <div className="fixed inset-0 z-0">
+        <WebcamPixelGrid
+          gridCols={48}
+          gridRows={36}
+          maxElevation={15}
+          motionSensitivity={0.6}
+          elevationSmoothing={0.12}
+          colorMode="monochrome"
+          monochromeColor="#ffffff"
+          backgroundColor="#000000"
+          mirror={true}
+          gapRatio={0.1}
+          invertColors={false}
+          darken={0.75}
+          borderColor="#ffffff"
+          borderOpacity={0.12}
+        />
+      </div>
+      
+      {/* Content Layer */}
+      <div className="relative z-10">
       {/* ✨ CHANGED: Main container now centers content vertically and horizontally */}
       <motion.div
         variants={containerVariants}
@@ -49,21 +72,21 @@ export default function ContactPage() {
               </motion.h1>
               <motion.p
                 variants={itemVariants}
-                className="text-xl text-gray-300 leading-relaxed font-medium"
+                className="text-xl text-zinc-300 leading-relaxed font-medium bg-black/40 backdrop-blur-sm p-4 rounded-lg"
               >
                 We are available for questions, feedback, or collaboration
                 opportunities. Let us know how we can help you achieve your goals!
               </motion.p>
               <motion.div
                 variants={itemVariants}
-                className="space-y-6 text-gray-300 pt-4"
+                className="space-y-6 text-gray-300 pt-4 bg-black/40 backdrop-blur-sm p-6 rounded-lg"
               >
                 {/* ✨ CHANGED: Added hover effects to contact info */}
                 <a
                   href="mailto:aayushsoodhp@gmail.com"
                   className="flex items-center space-x-4 group"
                 >
-                  <div className="bg-white/10 p-3 rounded-full backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-white/20">
+                  <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-white/30">
                     <svg
                       className="h-6 w-6 text-white"
                       fill="none"
@@ -83,7 +106,7 @@ export default function ContactPage() {
                   </span>
                 </a>
                 <a href="tel:+919882715895" className="flex items-center space-x-4 group">
-                  <div className="bg-white/10 p-3 rounded-full backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-white/20">
+                  <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:bg-white/30">
                     <svg
                       className="h-6 w-6 text-white"
                       fill="none"
@@ -112,5 +135,6 @@ export default function ContactPage() {
         </div>
       </motion.div>
       </div>
+    </div>
   );
 }

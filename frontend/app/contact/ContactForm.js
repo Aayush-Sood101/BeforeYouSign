@@ -62,7 +62,7 @@ export default function ContactForm() {
   };
 
   return (
-    <div className="shadow-2xl border border-white/10 bg-black/20 backdrop-blur-lg rounded-2xl overflow-hidden">
+    <div className="shadow-2xl border border-white/20 bg-black/30 backdrop-blur-xl rounded-2xl overflow-hidden">
       <div className="space-y-2 text-center pb-8 pt-8 px-6 md:px-8">
         {/* ✨ REWORKED: Updated text for branding */}
         <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
@@ -73,7 +73,7 @@ export default function ContactForm() {
         </p>
       </div>
 
-      <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mb-8"></div>
+      <div className="h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mb-8"></div>
 
       <div className="px-6 md:px-8 pb-8">
         <form ref={formRef} onSubmit={onSubmit} className="space-y-6">
@@ -111,7 +111,7 @@ export default function ContactForm() {
                   name="user_name"
                   type="text"
                   required
-                  className="w-full pl-11 py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
+                  className="w-full pl-11 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all duration-300"
                   placeholder="Your name"
                 />
               </div>
@@ -143,7 +143,7 @@ export default function ContactForm() {
                   name="user_email"
                   type="email"
                   required
-                  className="w-full pl-11 py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
+                  className="w-full pl-11 py-3 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all duration-300"
                   placeholder="you@example.com"
                 />
               </div>
@@ -162,7 +162,7 @@ export default function ContactForm() {
               name="subject"
               type="text"
               required
-              className="w-full py-3 px-4 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300"
+              className="w-full py-3 px-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition-all duration-300"
               // ✨ REWORKED: Updated placeholder text for better context.
               placeholder="e.g., Feature Request, Question"
             />
@@ -180,7 +180,7 @@ export default function ContactForm() {
               name="message"
               rows={5}
               required
-              className="w-full py-3 px-4 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all duration-300"
+              className="w-full py-3 px-4 bg-white/10 backdrop-blur-md border border-white/30 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent resize-none transition-all duration-300"
               placeholder="Write your message here…"
             />
           </div>
