@@ -153,7 +153,8 @@ export default function ContractAnalysis() {
       console.log("[ContractAnalysis] PDF file:", pdfFile.name, "Size:", pdfFile.size);
       console.log("[ContractAnalysis] GitHub Repo:", githubUrl);
 
-      const response = await fetch("http://localhost:3000/api/analyze", {
+      const apiUrl = process.env.NEXT_PUBLIC_CONTRACT_ANALYZER_API_URL || "http://localhost:3000";
+      const response = await fetch(`${apiUrl}/api/analyze`, {
         method: "POST",
         body: formData,
       });
