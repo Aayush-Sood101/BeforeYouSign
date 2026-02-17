@@ -40,15 +40,14 @@ export default function ContactPage() {
           maxElevation={15}
           motionSensitivity={0.6}
           elevationSmoothing={0.12}
-          colorMode="monochrome"
-          monochromeColor="#ffffff"
+          colorMode="webcam"
           backgroundColor="#000000"
           mirror={true}
           gapRatio={0.1}
           invertColors={false}
-          darken={0.75}
-          borderColor="#ffffff"
-          borderOpacity={0.12}
+          darken={0.5}
+          borderColor="#4a9eff"
+          borderOpacity={0.15}
         />
       </div>
       
