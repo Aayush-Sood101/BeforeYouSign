@@ -249,548 +249,879 @@ export default function ContractAnalysis() {
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 15;
+    const margin = 18;
     const contentWidth = pageWidth - margin * 2;
     let y = 0;
-    let pageNumber = 1;
+    let pageNumber = 0;
+    const totalPagesPlaceholder = "##TOTAL##";
 
-    // Color palette
-    const colors = {
-      primary: [79, 70, 229] as [number, number, number],      // Indigo
-      background: [250, 250, 252] as [number, number, number], // Light gray
-      white: [255, 255, 255] as [number, number, number],
-      black: [17, 24, 39] as [number, number, number],
-      gray: [107, 114, 128] as [number, number, number],
-      lightGray: [229, 231, 235] as [number, number, number],
-      critical: [220, 38, 38] as [number, number, number],     // Red
-      high: [234, 88, 12] as [number, number, number],         // Orange
-      medium: [202, 138, 4] as [number, number, number],       // Yellow/Amber
-      low: [37, 99, 235] as [number, number, number],          // Blue
-      success: [22, 163, 74] as [number, number, number],      // Green
-      danger: [185, 28, 28] as [number, number, number],       // Dark red
+    // ── Refined Color Palette ────────────────────────────────────────────────
+    const C = {
+      brand:     [15,  23,  42]  as [number, number, number],  // Slate-900
+      brandAlt:  [30,  41,  59]  as [number, number, number],  // Slate-800
+      accent:    [99, 102, 241]  as [number, number, number],  // Indigo-500
+      accentLt:  [224, 231, 255] as [number, number, number],  // Indigo-100
+      pageBg:    [248, 250, 252] as [number, number, number],  // Slate-50
+      cardBg:    [255, 255, 255] as [number, number, number],  // White
+      text:      [15,  23,  42]  as [number, number, number],  // Slate-900
+      textMuted: [100, 116, 139] as [number, number, number],  // Slate-500
+      textLight: [148, 163, 184] as [number, number, number],  // Slate-400
+      border:    [226, 232, 240] as [number, number, number],  // Slate-200
+      borderLt:  [241, 245, 249] as [number, number, number],  // Slate-100
+      critical:  [220,  38,  38] as [number, number, number],
+      critBg:    [254, 226, 226] as [number, number, number],
+      high:      [234,  88,  12] as [number, number, number],
+      highBg:    [255, 237, 213] as [number, number, number],
+      medium:    [161, 98,   7]  as [number, number, number],
+      mediumBg:  [254, 249, 195] as [number, number, number],
+      low:       [37,  99,  235] as [number, number, number],
+      lowBg:     [219, 234, 254] as [number, number, number],
+      safe:      [21,  128,  61] as [number, number, number],
+      safeBg:    [220, 252, 231] as [number, number, number],
+      white:     [255, 255, 255] as [number, number, number],
     };
 
-    const getSeverityColors = (severity: string): { bg: [number, number, number]; text: [number, number, number] } => {
-      const sev = (severity || "").toUpperCase();
-      if (sev.includes("CRITICAL")) return { bg: [254, 226, 226], text: colors.critical };
-      if (sev.includes("HIGH")) return { bg: [255, 237, 213], text: colors.high };
-      if (sev.includes("MEDIUM")) return { bg: [254, 249, 195], text: colors.medium };
-      if (sev.includes("LOW")) return { bg: [219, 234, 254], text: colors.low };
-      return { bg: colors.lightGray, text: colors.gray };
+    type RGB = [number, number, number];
+
+    const sevStyle = (severity: string): { bg: RGB; fg: RGB; label: string } => {
+      const s = (severity || "").toUpperCase();
+      if (s.includes("CRITICAL")) return { bg: C.critBg,   fg: C.critical, label: "CRITICAL" };
+      if (s.includes("HIGH"))     return { bg: C.highBg,   fg: C.high,     label: "HIGH" };
+      if (s.includes("MEDIUM"))   return { bg: C.mediumBg, fg: C.medium,   label: "MEDIUM" };
+      if (s.includes("LOW"))      return { bg: C.lowBg,    fg: C.low,      label: "LOW" };
+      return { bg: C.borderLt, fg: C.textMuted, label: s || "UNKNOWN" };
     };
 
-    const addPageBackground = () => {
-      pdf.setFillColor(...colors.background);
+    // ── Utility helpers ──────────────────────────────────────────────────────
+
+    /** Measure how many lines `text` will wrap into at `maxW` */
+    const measureLines = (text: string, fontSize: number, maxW: number, bold = false): string[] => {
+      pdf.setFont("helvetica", bold ? "bold" : "normal");
+      pdf.setFontSize(fontSize);
+      return pdf.splitTextToSize(text, maxW) as string[];
+    };
+
+    const lineH = (fontSize: number) => fontSize * 0.5;
+
+    // ── Page primitives ──────────────────────────────────────────────────────
+
+    const addPageBg = () => {
+      pdf.setFillColor(...C.pageBg);
       pdf.rect(0, 0, pageWidth, pageHeight, "F");
     };
 
-    const addHeader = () => {
-      // Header bar
-      pdf.setFillColor(...colors.primary);
-      pdf.rect(0, 0, pageWidth, 35, "F");
-      
-      // Title
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(18);
-      pdf.setTextColor(...colors.white);
-      pdf.text("Smart Contract Security Report", margin, 22);
-      
-      // Subtitle
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.setTextColor(200, 200, 255);
-      pdf.text("BeforeYouSign Security Analysis", pageWidth - margin - 70, 22);
-      
-      y = 45;
-    };
+    const addPageHeader = () => {
+      // Thin accent stripe
+      pdf.setFillColor(...C.accent);
+      pdf.rect(0, 0, pageWidth, 3, "F");
 
-    const addFooter = () => {
-      pdf.setDrawColor(...colors.lightGray);
-      pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+      // Brand bar
+      pdf.setFillColor(...C.brand);
+      pdf.rect(0, 3, pageWidth, 22, "F");
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.setTextColor(...C.white);
+      pdf.text("BeforeYouSign", margin, 17);
+
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
-      pdf.setTextColor(...colors.gray);
-      pdf.text("Generated by BeforeYouSign", margin, pageHeight - 8);
-      pdf.text(`Page ${pageNumber}`, pageWidth - margin - 15, pageHeight - 8);
+      pdf.setTextColor(...C.textLight);
+      pdf.text("Smart Contract Security Report", pageWidth - margin - 58, 17);
+
+      y = 32;
     };
 
-    const checkNewPage = (requiredSpace: number = 30) => {
-      if (y > pageHeight - requiredSpace - 20) {
-        addFooter();
+    const addPageFooter = () => {
+      const footerY = pageHeight - 12;
+      pdf.setDrawColor(...C.border);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, footerY - 3, pageWidth - margin, footerY - 3);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.setTextColor(...C.textLight);
+      pdf.text("Confidential  |  Generated by BeforeYouSign AI Security Analyzer", margin, footerY);
+      pdf.text(`Page ${pageNumber} of ${totalPagesPlaceholder}`, pageWidth - margin - 28, footerY);
+    };
+
+    const newPage = () => {
+      if (pageNumber > 0) {
+        addPageFooter();
+        pdf.addPage();
+      }
+      pageNumber++;
+      addPageBg();
+      addPageHeader();
+    };
+
+    const ensureSpace = (need: number) => {
+      if (y + need > pageHeight - 22) {
+        addPageFooter();
         pdf.addPage();
         pageNumber++;
-        addPageBackground();
-        y = 20;
+        addPageBg();
+        addPageHeader();
       }
     };
 
-    const addSectionHeader = (title: string, icon?: string) => {
-      checkNewPage(40);
-      y += 8;
-      
-      // Section background bar
-      pdf.setFillColor(...colors.primary);
-      pdf.roundedRect(margin, y - 5, contentWidth, 12, 2, 2, "F");
-      
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11);
-      pdf.setTextColor(...colors.white);
-      pdf.text(`${icon ? icon + "  " : ""}${title}`, margin + 5, y + 3);
-      y += 15;
+    // ── Drawing helpers ──────────────────────────────────────────────────────
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfExt = pdf as unknown as Record<string, any>;
+
+    const drawCard = (x: number, cardY: number, w: number, h: number, opts?: { accentColor?: RGB }) => {
+      // Shadow
+      pdf.setFillColor(0, 0, 0);
+      pdf.setGState(new pdfExt.GState({ opacity: 0.04 }));
+      pdf.roundedRect(x + 1, cardY + 1, w, h, 3, 3, "F");
+      pdf.setGState(new pdfExt.GState({ opacity: 1 }));
+
+      // Card
+      pdf.setFillColor(...C.cardBg);
+      pdf.roundedRect(x, cardY, w, h, 3, 3, "F");
+      pdf.setDrawColor(...C.border);
+      pdf.setLineWidth(0.3);
+      pdf.roundedRect(x, cardY, w, h, 3, 3, "S");
+
+      // Left accent
+      if (opts?.accentColor) {
+        pdf.setFillColor(...opts.accentColor);
+        pdf.rect(x, cardY + 3, 3, h - 6, "F");
+      }
     };
 
-    const addInfoBox = (label: string, value: string, x: number, width: number, bgColor: [number, number, number] = colors.white) => {
-      pdf.setFillColor(...bgColor);
-      pdf.roundedRect(x, y, width, 20, 2, 2, "F");
-      pdf.setDrawColor(...colors.lightGray);
-      pdf.roundedRect(x, y, width, 20, 2, 2, "S");
-      
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7);
-      pdf.setTextColor(...colors.gray);
-      pdf.text(label, x + 4, y + 7);
-      
+    const drawBadge = (text: string, x: number, badgeY: number, bg: RGB, fg: RGB): number => {
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...colors.black);
-      const truncatedValue = value.length > 25 ? value.substring(0, 22) + "..." : value;
-      pdf.text(truncatedValue, x + 4, y + 15);
+      pdf.setFontSize(6.5);
+      const tw = pdf.getTextWidth(text);
+      const bw = tw + 8;
+      pdf.setFillColor(...bg);
+      pdf.roundedRect(x, badgeY - 4.5, bw, 7, 2, 2, "F");
+      pdf.setTextColor(...fg);
+      pdf.text(text, x + 4, badgeY);
+      return bw;
     };
 
-    const addText = (text: string, x: number, options: {
-      size?: number;
-      bold?: boolean;
-      color?: [number, number, number];
-      maxWidth?: number;
-    } = {}) => {
-      const { size = 9, bold = false, color = colors.black, maxWidth = contentWidth - 10 } = options;
+    const drawWrappedText = (text: string, x: number, options: {
+      size?: number; bold?: boolean; color?: RGB; maxWidth?: number; spacing?: number;
+    } = {}): number => {
+      const { size = 9, bold = false, color = C.text, maxWidth = contentWidth - (x - margin) - 6, spacing } = options;
+      const lh = spacing ?? lineH(size);
+      const lines = measureLines(text, size, maxWidth, bold);
       pdf.setFont("helvetica", bold ? "bold" : "normal");
       pdf.setFontSize(size);
       pdf.setTextColor(...color);
-      
-      const lines = pdf.splitTextToSize(text, maxWidth);
-      lines.forEach((line: string) => {
-        checkNewPage(15);
+      let drawn = 0;
+      for (const line of lines) {
+        ensureSpace(lh + 4);
         pdf.text(line, x, y);
-        y += size * 0.45;
-      });
+        y += lh;
+        drawn++;
+      }
+      return drawn;
     };
 
-    const addBadge = (text: string, x: number, bgColor: [number, number, number], textColor: [number, number, number]) => {
-      const badgeWidth = pdf.getTextWidth(text) + 8;
-      pdf.setFillColor(...bgColor);
-      pdf.roundedRect(x, y - 4, badgeWidth, 7, 1.5, 1.5, "F");
+    const drawSectionTitle = (title: string) => {
+      ensureSpace(20);
+      y += 6;
+      // Accent left bar
+      pdf.setFillColor(...C.accent);
+      pdf.roundedRect(margin, y - 5, 3, 12, 1, 1, "F");
+      // Background
+      pdf.setFillColor(...C.accentLt);
+      pdf.roundedRect(margin + 4, y - 5, contentWidth - 4, 12, 2, 2, "F");
+      // Text
       pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(...C.brand);
+      pdf.text(title, margin + 10, y + 3);
+      y += 16;
+    };
+
+    const drawSubLabel = (label: string, x: number, labelY: number) => {
+      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(7);
-      pdf.setTextColor(...textColor);
-      pdf.text(text, x + 4, y);
-      return badgeWidth;
+      pdf.setTextColor(...C.textLight);
+      pdf.text(label.toUpperCase(), x, labelY);
     };
 
-    // =========================================================================
-    // START BUILDING PDF
-    // =========================================================================
 
-    addPageBackground();
-    addHeader();
 
-    // Report Info Row
-    pdf.setFillColor(...colors.white);
-    pdf.roundedRect(margin, y, contentWidth, 28, 3, 3, "F");
-    pdf.setDrawColor(...colors.lightGray);
-    pdf.roundedRect(margin, y, contentWidth, 28, 3, 3, "S");
-    
-    const infoY = y + 5;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.setTextColor(...colors.gray);
-    pdf.text("Repository", margin + 5, infoY + 5);
+    // ======================================================================
+    //  PAGE 1 — COVER PAGE
+    // ======================================================================
+
+    pageNumber++;
+    // Full-bleed dark cover
+    pdf.setFillColor(...C.brand);
+    pdf.rect(0, 0, pageWidth, pageHeight, "F");
+
+    // Decorative accent stripe
+    pdf.setFillColor(...C.accent);
+    pdf.rect(0, 0, pageWidth, 5, "F");
+
+    // Geometric decoration (subtle angled lines)
+    pdf.setDrawColor(255, 255, 255);
+    pdf.setLineWidth(0.15);
+    pdf.setGState(new pdfExt.GState({ opacity: 0.06 }));
+    for (let i = 0; i < 12; i++) {
+      pdf.line(pageWidth - 80 + i * 8, 0, pageWidth - 40 + i * 8, pageHeight);
+    }
+    pdf.setGState(new pdfExt.GState({ opacity: 1 }));
+
+    // Shield icon (drawn with shapes)
+    const shieldX = pageWidth / 2;
+    const shieldY = 72;
+    pdf.setFillColor(...C.accent);
+    pdf.circle(shieldX, shieldY, 20, "F");
+    pdf.setFillColor(...C.brand);
+    pdf.circle(shieldX, shieldY, 16, "F");
+    pdf.setFillColor(...C.accent);
+    pdf.circle(shieldX, shieldY, 11, "F");
+    // Checkmark in shield
+    pdf.setDrawColor(...C.white);
+    pdf.setLineWidth(2.5);
+    pdf.line(shieldX - 5, shieldY + 1, shieldX - 1, shieldY + 5);
+    pdf.line(shieldX - 1, shieldY + 5, shieldX + 7, shieldY - 5);
+    pdf.setLineWidth(0.2);
+
+    // Title
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    pdf.setTextColor(...colors.black);
-    pdf.text(result.codeExtraction.repository, margin + 5, infoY + 13);
-    
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8);
-    pdf.setTextColor(...colors.gray);
-    pdf.text("Generated", pageWidth - margin - 45, infoY + 5);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
-    pdf.setTextColor(...colors.black);
-    pdf.text(new Date().toLocaleDateString(), pageWidth - margin - 45, infoY + 13);
-    
-    y += 35;
+    pdf.setFontSize(32);
+    pdf.setTextColor(...C.white);
+    pdf.text("Security Audit Report", pageWidth / 2, 115, { align: "center" });
 
-    // Risk Score Section
-    if (ai.riskScore) {
-      const riskCls = (ai.riskScore.classification || "").toUpperCase();
-      const isHighRisk = riskCls.includes("HIGH") || riskCls.includes("CRITICAL") || riskCls.includes("SCAM");
-      const isMediumRisk = riskCls.includes("MEDIUM") || riskCls.includes("SUSPICIOUS");
-      
-      const riskBg: [number, number, number] = isHighRisk ? [254, 242, 242] : isMediumRisk ? [255, 251, 235] : [240, 253, 244];
-      const riskBorder: [number, number, number] = isHighRisk ? colors.critical : isMediumRisk ? colors.medium : colors.success;
-      const riskText: [number, number, number] = isHighRisk ? colors.danger : isMediumRisk ? colors.medium : colors.success;
-      
-      pdf.setFillColor(...riskBg);
-      pdf.roundedRect(margin, y, contentWidth, 45, 4, 4, "F");
-      pdf.setDrawColor(...riskBorder);
-      pdf.setLineWidth(0.5);
-      pdf.roundedRect(margin, y, contentWidth, 45, 4, 4, "S");
-      pdf.setLineWidth(0.2);
-      
-      // Risk Label
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(12);
+    pdf.setTextColor(...C.textLight);
+    pdf.text("Smart Contract Vulnerability Assessment", pageWidth / 2, 128, { align: "center" });
+
+    // Horizontal rule
+    pdf.setDrawColor(...C.accent);
+    pdf.setLineWidth(1);
+    pdf.line(pageWidth / 2 - 40, 140, pageWidth / 2 + 40, 140);
+    pdf.setLineWidth(0.2);
+
+    // Repository name
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(16);
+    pdf.setTextColor(...C.white);
+    const repoDisplayName = result.codeExtraction.repository || "Unknown Repository";
+    pdf.text(repoDisplayName, pageWidth / 2, 158, { align: "center" });
+
+    // Cover info cards
+    const coverCardW = 50;
+    const coverCardH = 38;
+    const coverInfoItems = [
+      { label: "FILES ANALYZED", value: result.codeExtraction.filesAnalyzed.toString() },
+      { label: "LINES OF CODE", value: result.codeExtraction.totalLines.toLocaleString() },
+      { label: "AI MODEL", value: result.metadata.aiModel },
+    ];
+    const coverCardsStartX = (pageWidth - (coverCardW * 3 + 16)) / 2;
+    coverInfoItems.forEach((item, idx) => {
+      const cx = coverCardsStartX + idx * (coverCardW + 8);
+      pdf.setFillColor(...C.brandAlt);
+      pdf.roundedRect(cx, 175, coverCardW, coverCardH, 3, 3, "F");
       pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...colors.gray);
-      pdf.text("RISK CLASSIFICATION", margin + 10, y + 12);
-      
-      // Risk Value
+      pdf.setFontSize(6.5);
+      pdf.setTextColor(...C.textLight);
+      pdf.text(item.label, cx + coverCardW / 2, 187, { align: "center" });
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(22);
-      pdf.setTextColor(...riskText);
-      pdf.text(ai.riskScore.classification || "Unknown", margin + 10, y + 30);
-      
-      // Trust Score
-      const scoreColor = (ai.riskScore.overall ?? 0) >= 7 ? colors.success : (ai.riskScore.overall ?? 0) >= 4 ? colors.medium : colors.critical;
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.setTextColor(...colors.gray);
-      pdf.text("Trust Score", pageWidth - margin - 50, y + 12);
-      
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(28);
-      pdf.setTextColor(...scoreColor);
-      pdf.text(`${ai.riskScore.overall?.toFixed(1) ?? "N/A"}`, pageWidth - margin - 50, y + 32);
-      
-      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(12);
-      pdf.setTextColor(...colors.gray);
-      pdf.text("/10", pageWidth - margin - 25, y + 32);
-      
-      y += 55;
+      pdf.setTextColor(...C.white);
+      const val = item.value.length > 10 ? item.value.substring(0, 9) + ".." : item.value;
+      pdf.text(val, cx + coverCardW / 2, 201, { align: "center" });
+    });
+
+    // Risk classification badge on cover
+    if (ai.riskScore) {
+      const riskCls = (ai.riskScore.classification || "UNKNOWN").toUpperCase();
+      const isHighRisk = riskCls.includes("HIGH") || riskCls.includes("CRITICAL") || riskCls.includes("SCAM");
+      const isMedRisk = riskCls.includes("MEDIUM") || riskCls.includes("SUSPICIOUS") || riskCls.includes("CAUTION");
+      const riskBadgeBg: RGB = isHighRisk ? C.critical : isMedRisk ? [202, 138, 4] : C.safe;
+
+      pdf.setFillColor(...riskBadgeBg);
+      pdf.roundedRect(pageWidth / 2 - 45, 230, 90, 28, 5, 5, "F");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(...C.white);
+      const classText = ai.riskScore.classification || "UNKNOWN";
+      pdf.text(classText, pageWidth / 2, 244, { align: "center" });
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.text(`Trust Score: ${ai.riskScore.overall?.toFixed(1) ?? "N/A"}/10`, pageWidth / 2, 253, { align: "center" });
     }
 
-    // Statistics Cards
-    const criticalCount = countBySeverity(ai.vulnerabilities, "CRITICAL") + countBySeverity(ai.discrepancies, "CRITICAL");
+    // Footer on cover
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(9);
+    pdf.setTextColor(...C.textLight);
+    pdf.text("Generated by BeforeYouSign", pageWidth / 2, pageHeight - 30, { align: "center" });
+    pdf.setFontSize(8);
+    pdf.text(new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }), pageWidth / 2, pageHeight - 22, { align: "center" });
+
+    // ======================================================================
+    //  PAGE 2 — OVERVIEW
+    // ======================================================================
+
+    newPage();
+
+    // ── Risk Assessment Card ─────────────────────────────────────────────
+    if (ai.riskScore) {
+      const riskCls = (ai.riskScore.classification || "").toUpperCase();
+      const isHigh = riskCls.includes("HIGH") || riskCls.includes("CRITICAL") || riskCls.includes("SCAM");
+      const isMed = riskCls.includes("MEDIUM") || riskCls.includes("SUSPICIOUS") || riskCls.includes("CAUTION");
+
+      const rBg: RGB = isHigh ? [254, 242, 242] : isMed ? [255, 251, 235] : [240, 253, 244];
+      const rFg: RGB = isHigh ? C.critical : isMed ? C.medium : C.safe;
+
+      pdf.setFillColor(...rBg);
+      pdf.roundedRect(margin, y, contentWidth, 40, 4, 4, "F");
+      pdf.setDrawColor(...rFg);
+      pdf.setLineWidth(0.6);
+      pdf.roundedRect(margin, y, contentWidth, 40, 4, 4, "S");
+      pdf.setLineWidth(0.2);
+
+      // Left side — classification
+      drawSubLabel("RISK CLASSIFICATION", margin + 10, y + 11);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(20);
+      pdf.setTextColor(...rFg);
+      pdf.text(ai.riskScore.classification || "Unknown", margin + 10, y + 28);
+
+      // Right side — score
+      const scoreVal = ai.riskScore.overall ?? 0;
+      const scoreClr: RGB = scoreVal >= 7 ? C.safe : scoreVal >= 4 ? C.medium : C.critical;
+      drawSubLabel("TRUST SCORE", pageWidth - margin - 48, y + 11);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(26);
+      pdf.setTextColor(...scoreClr);
+      pdf.text(`${ai.riskScore.overall?.toFixed(1) ?? "N/A"}`, pageWidth - margin - 48, y + 30);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.setTextColor(...C.textLight);
+      pdf.text("/10", pageWidth - margin - 22, y + 30);
+
+      y += 48;
+    }
+
+    // ── Severity Statistics Bar ───────────────────────────────────────────
+    const critCount = countBySeverity(ai.vulnerabilities, "CRITICAL") + countBySeverity(ai.discrepancies, "CRITICAL");
     const highCount = countBySeverity(ai.vulnerabilities, "HIGH") + countBySeverity(ai.discrepancies, "HIGH");
-    const mediumCount = countBySeverity(ai.vulnerabilities, "MEDIUM");
+    const medCount = countBySeverity(ai.vulnerabilities, "MEDIUM");
     const lowCount = countBySeverity(ai.vulnerabilities, "LOW");
     const totalIssues = (ai.vulnerabilities?.length || 0) + (ai.discrepancies?.length || 0) + (ai.codeQualityIssues?.length || 0);
 
-    const statWidth = (contentWidth - 20) / 5;
-    const statCards = [
-      { label: "Total Issues", value: totalIssues.toString(), bg: [241, 245, 249] as [number, number, number], color: colors.black },
-      { label: "Critical", value: criticalCount.toString(), bg: [254, 226, 226] as [number, number, number], color: colors.critical },
-      { label: "High", value: highCount.toString(), bg: [255, 237, 213] as [number, number, number], color: colors.high },
-      { label: "Medium", value: mediumCount.toString(), bg: [254, 249, 195] as [number, number, number], color: colors.medium },
-      { label: "Low", value: lowCount.toString(), bg: [219, 234, 254] as [number, number, number], color: colors.low },
+    const stats = [
+      { label: "Total Issues", val: totalIssues.toString(), bg: C.borderLt, fg: C.text },
+      { label: "Critical",     val: critCount.toString(),   bg: C.critBg,   fg: C.critical },
+      { label: "High",         val: highCount.toString(),   bg: C.highBg,   fg: C.high },
+      { label: "Medium",       val: medCount.toString(),    bg: C.mediumBg, fg: C.medium },
+      { label: "Low",          val: lowCount.toString(),    bg: C.lowBg,    fg: C.low },
     ];
 
-    statCards.forEach((stat, idx) => {
-      const x = margin + idx * (statWidth + 5);
-      pdf.setFillColor(...stat.bg);
-      pdf.roundedRect(x, y, statWidth, 25, 2, 2, "F");
-      
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(7);
-      pdf.setTextColor(...colors.gray);
-      pdf.text(stat.label, x + 5, y + 8);
-      
+    const statW = (contentWidth - 16) / 5;
+    stats.forEach((s, i) => {
+      const sx = margin + i * (statW + 4);
+      pdf.setFillColor(...s.bg);
+      pdf.roundedRect(sx, y, statW, 28, 3, 3, "F");
+      drawSubLabel(s.label, sx + 5, y + 9);
       pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(16);
-      pdf.setTextColor(...stat.color);
-      pdf.text(stat.value, x + 5, y + 20);
+      pdf.setFontSize(18);
+      pdf.setTextColor(...s.fg);
+      pdf.text(s.val, sx + 5, y + 23);
     });
-    
-    y += 35;
+    y += 36;
 
-    // Metadata Section
-    addSectionHeader("Analysis Details");
-    
-    const metaBoxWidth = (contentWidth - 15) / 4;
-    addInfoBox("AI Model", result.metadata.aiModel, margin, metaBoxWidth);
-    addInfoBox("Mode", result.metadata.analysisMode, margin + metaBoxWidth + 5, metaBoxWidth);
-    addInfoBox("Duration", result.metadata.duration, margin + (metaBoxWidth + 5) * 2, metaBoxWidth);
-    addInfoBox("Files", result.codeExtraction.filesAnalyzed.toString(), margin + (metaBoxWidth + 5) * 3, metaBoxWidth);
-    y += 28;
+    // ── Analysis Metadata ─────────────────────────────────────────────────
+    drawSectionTitle("Analysis Details");
 
-    // Summary
-    if (ai.summary) {
-      addSectionHeader("Executive Summary");
-      pdf.setFillColor(...colors.white);
-      pdf.roundedRect(margin, y, contentWidth, 35, 3, 3, "F");
-      pdf.setDrawColor(...colors.lightGray);
-      pdf.roundedRect(margin, y, contentWidth, 35, 3, 3, "S");
-      y += 8;
-      addText(ai.summary, margin + 8, { size: 9, color: colors.black, maxWidth: contentWidth - 16 });
-      y += 10;
-    }
+    const metaCols = 4;
+    const metaW = (contentWidth - (metaCols - 1) * 5) / metaCols;
+    const metaItems = [
+      { label: "Repository",  value: result.codeExtraction.repository },
+      { label: "AI Model",    value: result.metadata.aiModel },
+      { label: "Duration",    value: result.metadata.duration },
+      { label: "Date",        value: new Date(result.metadata.analyzedAt).toLocaleDateString() },
+    ];
+    metaItems.forEach((m, i) => {
+      const mx = margin + i * (metaW + 5);
+      pdf.setFillColor(...C.cardBg);
+      pdf.roundedRect(mx, y, metaW, 22, 2, 2, "F");
+      pdf.setDrawColor(...C.border);
+      pdf.roundedRect(mx, y, metaW, 22, 2, 2, "S");
+      drawSubLabel(m.label, mx + 5, y + 8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...C.text);
+      const mv = m.value.length > 22 ? m.value.substring(0, 20) + ".." : m.value;
+      pdf.text(mv, mx + 5, y + 17);
+    });
+    y += 30;
 
-    // Red Flags
-    if (ai.redFlags && ai.redFlags.length > 0) {
-      addSectionHeader("Red Flags", "⚠");
-      
-      pdf.setFillColor(254, 242, 242);
-      const flagsStartY = y;
-      y += 8;
-      
-      ai.redFlags.forEach((flag) => {
-        checkNewPage(20);
-        pdf.setFillColor(...colors.critical);
-        pdf.circle(margin + 8, y - 1, 1.5, "F");
-        addText(flag, margin + 15, { size: 9, color: colors.danger, maxWidth: contentWidth - 20 });
-        y += 2;
-      });
-      
-      const flagsHeight = y - flagsStartY + 5;
-      pdf.setFillColor(254, 242, 242);
-      pdf.roundedRect(margin, flagsStartY - 5, contentWidth, flagsHeight, 3, 3, "F");
-      pdf.setDrawColor(252, 165, 165);
-      pdf.roundedRect(margin, flagsStartY - 5, contentWidth, flagsHeight, 3, 3, "S");
-      
-      y += 5;
-    }
-
-    // Positive Aspects
-    if (ai.positiveAspects && ai.positiveAspects.length > 0) {
-      addSectionHeader("Positive Aspects", "✓");
-      
-      const posStartY = y;
-      y += 8;
-      
-      ai.positiveAspects.forEach((aspect) => {
-        checkNewPage(20);
-        pdf.setFillColor(...colors.success);
-        pdf.circle(margin + 8, y - 1, 1.5, "F");
-        addText(aspect, margin + 15, { size: 9, color: [21, 128, 61], maxWidth: contentWidth - 20 });
-        y += 2;
-      });
-      
-      const posHeight = y - posStartY + 5;
-      pdf.setFillColor(240, 253, 244);
-      pdf.roundedRect(margin, posStartY - 5, contentWidth, posHeight, 3, 3, "F");
-      pdf.setDrawColor(134, 239, 172);
-      pdf.roundedRect(margin, posStartY - 5, contentWidth, posHeight, 3, 3, "S");
-      
-      y += 5;
-    }
-
-    // Discrepancies
-    if (ai.discrepancies && ai.discrepancies.length > 0) {
-      addSectionHeader(`Discrepancies (${ai.discrepancies.length})`);
-      
-      ai.discrepancies.forEach((disc) => {
-        checkNewPage(60);
-        
-        const cardStartY = y;
-        const sevColors = getSeverityColors(disc.severity);
-        
-        // Card background
-        pdf.setFillColor(...colors.white);
-        pdf.roundedRect(margin, y, contentWidth, 50, 3, 3, "F");
-        pdf.setDrawColor(...colors.lightGray);
-        pdf.roundedRect(margin, y, contentWidth, 50, 3, 3, "S");
-        
-        // Left accent bar
-        pdf.setFillColor(...sevColors.text);
-        pdf.rect(margin, y, 3, 50, "F");
-        
-        y += 10;
-        
-        // Badge
-        addBadge(disc.severity || "UNKNOWN", margin + 10, sevColors.bg, sevColors.text);
-        
-        // Title
+    // Additional metadata row
+    if (result.pdfExtraction) {
+      const extraItems = [
+        { label: "PDF File",      value: result.metadata.pdfFile || "N/A" },
+        { label: "PDF Pages",     value: result.pdfExtraction.pages.toString() },
+        { label: "Files Analyzed", value: result.codeExtraction.filesAnalyzed.toString() },
+        { label: "Total Lines",   value: result.codeExtraction.totalLines.toLocaleString() },
+      ];
+      extraItems.forEach((m, i) => {
+        const mx = margin + i * (metaW + 5);
+        pdf.setFillColor(...C.borderLt);
+        pdf.roundedRect(mx, y, metaW, 22, 2, 2, "F");
+        drawSubLabel(m.label, mx + 5, y + 8);
         pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.setTextColor(...colors.black);
-        pdf.text(formatKey(disc.type || "Unknown"), margin + 45, y);
-        y += 8;
-        
+        pdf.setFontSize(8);
+        pdf.setTextColor(...C.text);
+        const mv = m.value.length > 22 ? m.value.substring(0, 20) + ".." : m.value;
+        pdf.text(mv, mx + 5, y + 17);
+      });
+      y += 30;
+    }
+
+    // ── Executive Summary ─────────────────────────────────────────────────
+    if (ai.summary) {
+      drawSectionTitle("Executive Summary");
+      const summaryLines = measureLines(ai.summary, 9, contentWidth - 20);
+      const boxH = Math.max(20, summaryLines.length * lineH(9) + 16);
+      ensureSpace(boxH + 4);
+      drawCard(margin, y, contentWidth, boxH);
+      y += 10;
+      drawWrappedText(ai.summary, margin + 10, { size: 9, color: C.text, maxWidth: contentWidth - 20 });
+      y += 8;
+    }
+
+    // ── Red Flags ─────────────────────────────────────────────────────────
+    if (ai.redFlags && ai.redFlags.length > 0) {
+      drawSectionTitle(`Red Flags (${ai.redFlags.length})`);
+
+      // Pre-measure total height
+      let flagsTotalH = 10;
+      ai.redFlags.forEach(f => {
+        const fl = measureLines(f, 8.5, contentWidth - 28);
+        flagsTotalH += fl.length * lineH(8.5) + 5;
+      });
+
+      ensureSpace(Math.min(flagsTotalH + 10, 100));
+
+      const flagsBoxY = y;
+
+      // Draw background + border FIRST
+      pdf.setFillColor(254, 242, 242);
+      pdf.roundedRect(margin, flagsBoxY, contentWidth, flagsTotalH, 3, 3, "F");
+      pdf.setDrawColor(252, 165, 165);
+      pdf.setLineWidth(0.4);
+      pdf.roundedRect(margin, flagsBoxY, contentWidth, flagsTotalH, 3, 3, "S");
+      pdf.setLineWidth(0.2);
+      // Accent bar
+      pdf.setFillColor(...C.critical);
+      pdf.rect(margin, flagsBoxY + 3, 3, flagsTotalH - 6, "F");
+
+      y = flagsBoxY + 8;
+
+      ai.redFlags.forEach((flag) => {
+        ensureSpace(16);
+        // Bullet
+        pdf.setFillColor(...C.critical);
+        pdf.circle(margin + 10, y - 1.2, 1.5, "F");
+        drawWrappedText(flag, margin + 16, { size: 8.5, color: [153, 27, 27], maxWidth: contentWidth - 28 });
+        y += 3;
+      });
+
+      y += 6;
+    }
+
+    // ── Positive Aspects ──────────────────────────────────────────────────
+    if (ai.positiveAspects && ai.positiveAspects.length > 0) {
+      drawSectionTitle(`Positive Aspects (${ai.positiveAspects.length})`);
+
+      let posTotalH = 10;
+      ai.positiveAspects.forEach(a => {
+        const al = measureLines(a, 8.5, contentWidth - 28);
+        posTotalH += al.length * lineH(8.5) + 5;
+      });
+
+      ensureSpace(Math.min(posTotalH + 10, 100));
+
+      const posBoxY = y;
+
+      pdf.setFillColor(240, 253, 244);
+      pdf.roundedRect(margin, posBoxY, contentWidth, posTotalH, 3, 3, "F");
+      pdf.setDrawColor(134, 239, 172);
+      pdf.setLineWidth(0.4);
+      pdf.roundedRect(margin, posBoxY, contentWidth, posTotalH, 3, 3, "S");
+      pdf.setLineWidth(0.2);
+      pdf.setFillColor(...C.safe);
+      pdf.rect(margin, posBoxY + 3, 3, posTotalH - 6, "F");
+
+      y = posBoxY + 8;
+
+      ai.positiveAspects.forEach((aspect) => {
+        ensureSpace(16);
+        pdf.setFillColor(...C.safe);
+        pdf.circle(margin + 10, y - 1.2, 1.5, "F");
+        drawWrappedText(aspect, margin + 16, { size: 8.5, color: [21, 128, 61], maxWidth: contentWidth - 28 });
+        y += 3;
+      });
+
+      y += 6;
+    }
+
+    // ── Discrepancies ─────────────────────────────────────────────────────
+    if (ai.discrepancies && ai.discrepancies.length > 0) {
+      drawSectionTitle(`PDF vs Code Discrepancies (${ai.discrepancies.length})`);
+
+      ai.discrepancies.forEach((disc) => {
+        // Pre-measure card height
+        let cardH = 18;
         if (disc.description) {
-          addText(disc.description, margin + 10, { size: 8, color: colors.gray, maxWidth: contentWidth - 20 });
+          const dl = measureLines(disc.description, 8, contentWidth - 24);
+          cardH += dl.length * lineH(8) + 4;
         }
-        
         if (disc.pdfClaim) {
-          y += 2;
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(7);
-          pdf.setTextColor(...colors.low);
-          pdf.text("PDF Claim: ", margin + 10, y);
-          pdf.setFont("helvetica", "normal");
-          pdf.text(disc.pdfClaim.substring(0, 80), margin + 35, y);
-          y += 4;
+          const pl = measureLines(`PDF Claim: ${disc.pdfClaim}`, 7.5, contentWidth - 28);
+          cardH += pl.length * lineH(7.5) + 4;
         }
-        
         if (disc.codeReality) {
-          pdf.setFont("helvetica", "bold");
-          pdf.setFontSize(7);
-          pdf.setTextColor(...colors.critical);
-          pdf.text("Reality: ", margin + 10, y);
-          pdf.setFont("helvetica", "normal");
-          pdf.text(disc.codeReality.substring(0, 85), margin + 28, y);
+          const rl = measureLines(`Code Reality: ${disc.codeReality}`, 7.5, contentWidth - 28);
+          cardH += rl.length * lineH(7.5) + 4;
         }
-        
-        y = cardStartY + 55;
+        if (disc.impact) {
+          const il = measureLines(`Impact: ${disc.impact}`, 7.5, contentWidth - 28);
+          cardH += il.length * lineH(7.5) + 4;
+        }
+        cardH += 6;
+
+        ensureSpace(cardH + 6);
+
+        const sev = sevStyle(disc.severity);
+        drawCard(margin, y, contentWidth, cardH, { accentColor: sev.fg });
+
+        const cardTop = y;
+        y += 10;
+
+        // Badge + Title
+        const bw = drawBadge(sev.label, margin + 10, y, sev.bg, sev.fg);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(...C.text);
+        pdf.text(formatKey(disc.type || "Unknown"), margin + 12 + bw + 4, y);
+        y += 6;
+
+        if (disc.description) {
+          drawWrappedText(disc.description, margin + 10, { size: 8, color: C.textMuted, maxWidth: contentWidth - 24 });
+          y += 2;
+        }
+
+        if (disc.pdfClaim) {
+          pdf.setFillColor(...C.lowBg);
+          const claimLines = measureLines(`PDF Claim: ${disc.pdfClaim}`, 7.5, contentWidth - 28);
+          const claimH = claimLines.length * lineH(7.5) + 6;
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, claimH, 2, 2, "F");
+          y += 2;
+          drawWrappedText(`PDF Claim: ${disc.pdfClaim}`, margin + 12, { size: 7.5, color: C.low, maxWidth: contentWidth - 28 });
+          y += 2;
+        }
+
+        if (disc.codeReality) {
+          pdf.setFillColor(...C.critBg);
+          const realLines = measureLines(`Code Reality: ${disc.codeReality}`, 7.5, contentWidth - 28);
+          const realH = realLines.length * lineH(7.5) + 6;
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, realH, 2, 2, "F");
+          y += 2;
+          drawWrappedText(`Code Reality: ${disc.codeReality}`, margin + 12, { size: 7.5, color: C.critical, maxWidth: contentWidth - 28 });
+          y += 2;
+        }
+
+        if (disc.impact) {
+          y += 1;
+          drawWrappedText(`Impact: ${disc.impact}`, margin + 10, { size: 7.5, color: [153, 27, 27], maxWidth: contentWidth - 24 });
+        }
+
+        y = cardTop + cardH + 5;
       });
     }
 
-    // Vulnerabilities
+    // ── Security Vulnerabilities ──────────────────────────────────────────
     if (ai.vulnerabilities && ai.vulnerabilities.length > 0) {
-      addSectionHeader(`Security Vulnerabilities (${ai.vulnerabilities.length})`);
-      
+      drawSectionTitle(`Security Vulnerabilities (${ai.vulnerabilities.length})`);
+
       const severityOrder: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
       const sorted = [...ai.vulnerabilities].sort(
         (a, b) => (severityOrder[a.severity?.toUpperCase()] ?? 4) - (severityOrder[b.severity?.toUpperCase()] ?? 4)
       );
-      
+
       sorted.forEach((vuln) => {
-        checkNewPage(70);
-        
-        const cardStartY = y;
-        const sevColors = getSeverityColors(vuln.severity);
-        
-        // Card
-        pdf.setFillColor(...colors.white);
-        pdf.roundedRect(margin, y, contentWidth, 60, 3, 3, "F");
-        pdf.setDrawColor(...colors.lightGray);
-        pdf.roundedRect(margin, y, contentWidth, 60, 3, 3, "S");
-        
-        // Accent
-        pdf.setFillColor(...sevColors.text);
-        pdf.rect(margin, y, 3, 60, "F");
-        
-        y += 10;
-        
-        // Badge and title
-        addBadge(vuln.severity || "UNKNOWN", margin + 10, sevColors.bg, sevColors.text);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        pdf.setTextColor(...colors.black);
-        pdf.text(formatKey(vuln.type || "Unknown"), margin + 45, y);
-        y += 8;
-        
+        // Pre-measure
+        let cardH = 18;
         if (vuln.description) {
-          addText(vuln.description.substring(0, 200), margin + 10, { size: 8, color: colors.gray, maxWidth: contentWidth - 20 });
+          const dl = measureLines(vuln.description, 8, contentWidth - 24);
+          cardH += dl.length * lineH(8) + 4;
         }
-        
-        y += 3;
-        
+        if (vuln.location) cardH += 12;
+        if (vuln.exploit) {
+          const el = measureLines(`Exploit: ${vuln.exploit}`, 7.5, contentWidth - 28);
+          cardH += el.length * lineH(7.5) + 6;
+        }
+        if (vuln.recommendation) {
+          const rl = measureLines(`Recommendation: ${vuln.recommendation}`, 7.5, contentWidth - 28);
+          cardH += rl.length * lineH(7.5) + 6;
+        }
+        if (vuln.financialImpact) {
+          const fl = measureLines(`Financial Impact: ${vuln.financialImpact}`, 7.5, contentWidth - 28);
+          cardH += fl.length * lineH(7.5) + 6;
+        }
+        cardH += 8;
+
+        ensureSpace(cardH + 6);
+
+        const sev = sevStyle(vuln.severity);
+        drawCard(margin, y, contentWidth, cardH, { accentColor: sev.fg });
+
+        const cardTop = y;
+        y += 10;
+
+        // Badge + title
+        const bw = drawBadge(sev.label, margin + 10, y, sev.bg, sev.fg);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(...C.text);
+        pdf.text(formatKey(vuln.type || "Unknown"), margin + 12 + bw + 4, y);
+        y += 6;
+
+        if (vuln.description) {
+          drawWrappedText(vuln.description, margin + 10, { size: 8, color: C.textMuted, maxWidth: contentWidth - 24 });
+          y += 2;
+        }
+
         if (vuln.location) {
-          pdf.setFillColor(243, 244, 246);
-          pdf.roundedRect(margin + 10, y - 3, contentWidth - 25, 8, 1, 1, "F");
+          pdf.setFillColor(...C.borderLt);
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, 10, 2, 2, "F");
           pdf.setFont("helvetica", "normal");
           pdf.setFontSize(7);
           pdf.setTextColor(107, 33, 168);
-          pdf.text(`Location: ${vuln.location}`, margin + 13, y + 2);
-          y += 8;
+          pdf.text(`Location: ${vuln.location}`, margin + 12, y + 4);
+          y += 12;
         }
-        
-        if (vuln.recommendation) {
+
+        if (vuln.exploit) {
+          pdf.setFillColor(...C.highBg);
+          const exLines = measureLines(`Exploit: ${vuln.exploit}`, 7.5, contentWidth - 28);
+          const exH = exLines.length * lineH(7.5) + 6;
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, exH, 2, 2, "F");
           y += 2;
-          pdf.setFillColor(240, 253, 244);
-          pdf.roundedRect(margin + 10, y - 3, contentWidth - 25, 10, 1, 1, "F");
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(7);
-          pdf.setTextColor(...colors.success);
-          const recText = vuln.recommendation.length > 100 ? vuln.recommendation.substring(0, 97) + "..." : vuln.recommendation;
-          pdf.text(`Fix: ${recText}`, margin + 13, y + 3);
+          drawWrappedText(`Exploit: ${vuln.exploit}`, margin + 12, { size: 7.5, color: C.high, maxWidth: contentWidth - 28 });
+          y += 2;
         }
-        
-        y = cardStartY + 65;
+
+        if (vuln.financialImpact) {
+          pdf.setFillColor(...C.critBg);
+          const fiLines = measureLines(`Financial Impact: ${vuln.financialImpact}`, 7.5, contentWidth - 28);
+          const fiH = fiLines.length * lineH(7.5) + 6;
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, fiH, 2, 2, "F");
+          y += 2;
+          drawWrappedText(`Financial Impact: ${vuln.financialImpact}`, margin + 12, { size: 7.5, color: C.critical, maxWidth: contentWidth - 28 });
+          y += 2;
+        }
+
+        if (vuln.recommendation) {
+          pdf.setFillColor(...C.safeBg);
+          const rcLines = measureLines(`Recommendation: ${vuln.recommendation}`, 7.5, contentWidth - 28);
+          const rcH = rcLines.length * lineH(7.5) + 6;
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, rcH, 2, 2, "F");
+          y += 2;
+          drawWrappedText(`Recommendation: ${vuln.recommendation}`, margin + 12, { size: 7.5, color: C.safe, maxWidth: contentWidth - 28 });
+          y += 2;
+        }
+
+        y = cardTop + cardH + 5;
       });
     }
 
-    // Code Quality Issues
+    // ── Code Quality Issues ───────────────────────────────────────────────
     if (ai.codeQualityIssues && ai.codeQualityIssues.length > 0) {
-      addSectionHeader(`Code Quality Issues (${ai.codeQualityIssues.length})`);
-      
+      drawSectionTitle(`Code Quality Issues (${ai.codeQualityIssues.length})`);
+
       ai.codeQualityIssues.forEach((issue) => {
-        checkNewPage(35);
-        
-        const sevColors = getSeverityColors(issue.severity);
-        
-        pdf.setFillColor(...colors.white);
-        pdf.roundedRect(margin, y, contentWidth, 28, 2, 2, "F");
-        pdf.setDrawColor(...colors.lightGray);
-        pdf.roundedRect(margin, y, contentWidth, 28, 2, 2, "S");
-        pdf.setFillColor(...sevColors.text);
-        pdf.rect(margin, y, 2, 28, "F");
-        
-        y += 8;
-        addBadge(issue.severity || "UNKNOWN", margin + 8, sevColors.bg, sevColors.text);
+        let cardH = 16;
+        if (issue.description) {
+          const dl = measureLines(issue.description, 8, contentWidth - 24);
+          cardH += dl.length * lineH(8) + 2;
+        }
+        if (issue.location) cardH += 10;
+        if (issue.recommendation) {
+          const rl = measureLines(`Fix: ${issue.recommendation}`, 7.5, contentWidth - 28);
+          cardH += rl.length * lineH(7.5) + 6;
+        }
+        cardH += 8;
+
+        ensureSpace(cardH + 4);
+
+        const sev = sevStyle(issue.severity);
+        drawCard(margin, y, contentWidth, cardH, { accentColor: sev.fg });
+
+        const cardTop = y;
+        y += 10;
+
+        const bw = drawBadge(sev.label, margin + 10, y, sev.bg, sev.fg);
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(9);
-        pdf.setTextColor(...colors.black);
-        pdf.text(formatKey(issue.type || "Unknown"), margin + 40, y);
+        pdf.setTextColor(...C.text);
+        pdf.text(formatKey(issue.type || "Unknown"), margin + 12 + bw + 4, y);
         y += 6;
-        
+
         if (issue.description) {
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(8);
-          pdf.setTextColor(...colors.gray);
-          const desc = issue.description.length > 100 ? issue.description.substring(0, 97) + "..." : issue.description;
-          pdf.text(desc, margin + 8, y + 2);
+          drawWrappedText(issue.description, margin + 10, { size: 8, color: C.textMuted, maxWidth: contentWidth - 24 });
+          y += 2;
         }
-        
-        y += 18;
+
+        if (issue.location) {
+          pdf.setFillColor(...C.borderLt);
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, 8, 1, 1, "F");
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(7);
+          pdf.setTextColor(107, 33, 168);
+          pdf.text(`Location: ${issue.location}`, margin + 12, y + 3);
+          y += 10;
+        }
+
+        if (issue.recommendation) {
+          pdf.setFillColor(...C.safeBg);
+          const rl = measureLines(`Fix: ${issue.recommendation}`, 7.5, contentWidth - 28);
+          const rH = rl.length * lineH(7.5) + 6;
+          pdf.roundedRect(margin + 8, y - 2, contentWidth - 18, rH, 2, 2, "F");
+          y += 2;
+          drawWrappedText(`Fix: ${issue.recommendation}`, margin + 12, { size: 7.5, color: C.safe, maxWidth: contentWidth - 28 });
+          y += 2;
+        }
+
+        y = cardTop + cardH + 4;
       });
     }
 
-    // Tokenomics
+    // ── Tokenomics Verification ───────────────────────────────────────────
     if (ai.tokenomicsVerification && Object.keys(ai.tokenomicsVerification).length > 0) {
-      addSectionHeader("Tokenomics Verification");
-      
+      drawSectionTitle("Tokenomics Verification");
+
       const entries = Object.entries(ai.tokenomicsVerification);
-      const boolEntries = entries.filter(([, v]) => typeof v === "boolean");
-      
+      const boolEntries = entries.filter(([, v]) => typeof v === "boolean") as [string, boolean][];
+      const strEntries = entries.filter(([, v]) => typeof v === "string") as [string, string][];
+
       if (boolEntries.length > 0) {
-        const colWidth = (contentWidth - 10) / 3;
-        let col = 0;
-        const startY = y;
-        
+        const colW = (contentWidth - 10) / 3;
         boolEntries.forEach(([key, value], idx) => {
-          const isBadIfTrue = key.includes("Mismatch") || key.includes("unlimited") || 
-            key.includes("canFreeze") || key.includes("canSeize") || 
-            key.includes("Backdoor") || key.includes("Instant") || 
+          const col = idx % 3;
+          if (col === 0) ensureSpace(20);
+          const x = margin + col * (colW + 5);
+
+          const isBadIfTrue = key.includes("Mismatch") || key.includes("unlimited") ||
+            key.includes("canFreeze") || key.includes("canSeize") ||
+            key.includes("Backdoor") || key.includes("Instant") ||
             key.includes("fake") || key.includes("has");
           const isBad = isBadIfTrue ? value : !value;
-          
-          const x = margin + col * (colWidth + 5);
-          const boxY = startY + Math.floor(idx / 3) * 18;
-          
-          if (boxY > pageHeight - 40) {
-            checkNewPage(30);
-          }
-          
-          const bgColor: [number, number, number] = isBad ? [254, 242, 242] : [240, 253, 244];
-          const textColor: [number, number, number] = isBad ? colors.critical : colors.success;
-          
-          pdf.setFillColor(...bgColor);
-          pdf.roundedRect(x, boxY, colWidth, 14, 2, 2, "F");
-          
-          pdf.setFont("helvetica", "normal");
-          pdf.setFontSize(7);
-          pdf.setTextColor(...colors.gray);
-          pdf.text(formatKey(key), x + 4, boxY + 5);
-          
+
+          const bg: RGB = isBad ? C.critBg : C.safeBg;
+          const fg: RGB = isBad ? C.critical : C.safe;
+
+          pdf.setFillColor(...bg);
+          pdf.roundedRect(x, y, colW, 16, 2, 2, "F");
+          drawSubLabel(formatKey(key), x + 5, y + 6);
           pdf.setFont("helvetica", "bold");
           pdf.setFontSize(8);
-          pdf.setTextColor(...textColor);
-          pdf.text(value ? "Yes" : "No", x + colWidth - 15, boxY + 10);
-          
-          col = (col + 1) % 3;
-          if (col === 0) y = boxY + 18;
+          pdf.setTextColor(...fg);
+          pdf.text(value ? "Yes" : "No", x + colW - 16, y + 12);
+
+          if (col === 2 || idx === boolEntries.length - 1) y += 20;
         });
-        
-        y += 20;
+      }
+
+      if (strEntries.length > 0) {
+        const strColW = (contentWidth - 5) / 2;
+        strEntries.forEach(([key, value], idx) => {
+          const col = idx % 2;
+          if (col === 0) ensureSpace(20);
+          const x = margin + col * (strColW + 5);
+
+          pdf.setFillColor(...C.cardBg);
+          pdf.roundedRect(x, y, strColW, 16, 2, 2, "F");
+          pdf.setDrawColor(...C.border);
+          pdf.roundedRect(x, y, strColW, 16, 2, 2, "S");
+          drawSubLabel(formatKey(key), x + 5, y + 6);
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          pdf.setTextColor(...C.text);
+          const sv = value.length > 35 ? value.substring(0, 32) + "..." : value;
+          pdf.text(sv, x + 5, y + 13);
+
+          if (col === 1 || idx === strEntries.length - 1) y += 20;
+        });
       }
     }
 
-    // Add footer to last page
-    addFooter();
+    // ── Tokenomics Analysis (quick mode) ──────────────────────────────────
+    if (ai.tokenomicsAnalysis) {
+      drawSectionTitle("Tokenomics Analysis");
+      const ta = ai.tokenomicsAnalysis;
 
-    // Save the PDF
+      const taItems = [
+        ta.totalSupply && { label: "Total Supply", value: ta.totalSupply },
+        ta.transactionFees && { label: "Tx Fees", value: ta.transactionFees },
+        { label: "Mint Function", value: ta.hasMintFunction ? "Yes (Risk)" : "No" },
+        { label: "Burn Function", value: ta.hasBurnFunction ? "Yes" : "No" },
+      ].filter(Boolean) as { label: string; value: string }[];
+
+      const taW = (contentWidth - (taItems.length - 1) * 5) / taItems.length;
+      ensureSpace(28);
+      taItems.forEach((item, i) => {
+        const x = margin + i * (taW + 5);
+        pdf.setFillColor(...C.cardBg);
+        pdf.roundedRect(x, y, taW, 22, 2, 2, "F");
+        pdf.setDrawColor(...C.border);
+        pdf.roundedRect(x, y, taW, 22, 2, 2, "S");
+        drawSubLabel(item.label, x + 5, y + 8);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(8);
+        pdf.setTextColor(...C.text);
+        const v = item.value.length > 18 ? item.value.substring(0, 16) + ".." : item.value;
+        pdf.text(v, x + 5, y + 17);
+      });
+      y += 28;
+
+      if (ta.ownerPrivileges && ta.ownerPrivileges.length > 0) {
+        ensureSpace(ta.ownerPrivileges.length * 7 + 16);
+        y += 4;
+        drawSubLabel("OWNER PRIVILEGES", margin + 5, y);
+        y += 5;
+        ta.ownerPrivileges.forEach(priv => {
+          ensureSpace(8);
+          pdf.setFillColor(...C.highBg);
+          pdf.circle(margin + 8, y - 1, 1.2, "F");
+          drawWrappedText(priv, margin + 14, { size: 8, color: C.high, maxWidth: contentWidth - 20 });
+          y += 2;
+        });
+        y += 4;
+      }
+    }
+
+    // ── Final footer on last page ─────────────────────────────────────────
+    addPageFooter();
+
+    // ── Stamp total page count ────────────────────────────────────────────
+    const totalPages = pdf.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      pdf.setPage(p);
+      // Replace placeholder with actual total
+      // This is a bit of a workaround - we will use putTotalPages
+    }
+
+    // jsPDF putTotalPages support
+    if (typeof pdfExt.putTotalPages === "function") {
+      pdfExt.putTotalPages(totalPagesPlaceholder);
+    }
+
+    // ── Save ──────────────────────────────────────────────────────────────
     const repoName = result.codeExtraction.repository.split("/").pop() || "contract";
     const timestamp = new Date().toISOString().split("T")[0];
     pdf.save(`${repoName}-security-report-${timestamp}.pdf`);
